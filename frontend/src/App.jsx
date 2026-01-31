@@ -2,7 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import MainLayout from "./layouts/MainLayout";
 import Dashboard from "./pages/Dashboard";
-import { DocumentsPage, UsersPage, SettingsPage, SigningQueuePage } from "./pages/Placeholders";
+import DocumentExplorer from "./pages/DocumentExplorer";
+import { UsersPage, SettingsPage, SigningQueuePage } from "./pages/Placeholders";
 
 export default function App() {
   return (
@@ -15,7 +16,7 @@ export default function App() {
           {/* Protected Routes (Wrapped in MainLayout) */}
           <Route path="/" element={<MainLayout />}>
             <Route index element={<Dashboard />} />
-            <Route path="documents" element={<DocumentsPage />} />
+            <Route path="documents" element={<DocumentExplorer />} />
             <Route path="users" element={<UsersPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="signing-queue" element={<SigningQueuePage />} />
