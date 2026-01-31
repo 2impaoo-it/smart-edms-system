@@ -3,7 +3,8 @@ import { AuthProvider } from "./context/AuthContext";
 import MainLayout from "./layouts/MainLayout";
 import Dashboard from "./pages/Dashboard";
 import DocumentExplorer from "./pages/DocumentExplorer";
-import { UsersPage, SettingsPage, SigningQueuePage } from "./pages/Placeholders";
+import UserManagement from "./pages/UserManagement";
+import { SettingsPage, SigningQueuePage } from "./pages/Placeholders";
 
 export default function App() {
   return (
@@ -17,7 +18,7 @@ export default function App() {
           <Route path="/" element={<MainLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="documents" element={<DocumentExplorer />} />
-            <Route path="users" element={<UsersPage />} />
+            <Route path="users" element={<UserManagement />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="signing-queue" element={<SigningQueuePage />} />
           </Route>
