@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
     Folder, FileText, MoreVertical, Search, Plus,
     Grid, List as ListIcon, Filter, Download, Share2, Trash2,
@@ -46,57 +47,67 @@ const ORGANIZATION_DATA = [
 
 export default function DocumentExplorer() {
     const { user } = useAuth();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const folderId = searchParams.get('folder');
+
     const [viewMode, setViewMode] = useState("grid");
-    const [currentPath, setCurrentPath] = useState([]); // Array of folder objects
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedDocs, setSelectedDocs] = useState([]);
 
-    // Helper to find items in current path
-    const getCurrentItems = () => {
-        let items = ORGANIZATION_DATA;
-        for (const folder of currentPath) {
-            const found = items.find(i => i.id === folder.id);
-            if (found && found.items) {
-                items = found.items;
-            } else {
-                return [];
+    // Recursive Helper to find path to a folder ID
+    const findPath = (targetId, nodes, path = []) => {
+        for (const node of nodes) {
+            if (node.id === targetId) return [...path, node];
+            if (node.items) {
+                const foundPath = findPath(targetId, node.items, [...path, node]);
+                if (foundPath) return foundPath;
             }
         }
-        return items;
+        return null;
     };
 
-    // Helper to flatten tree for search
-    const getAllItemsFlat = (items = ORGANIZATION_DATA) => {
-        let flat = [];
-        for (const item of items) {
-            flat.push(item);
-            if (item.items) {
-                flat = [...flat, ...getAllItemsFlat(item.items)];
-            }
-        }
-        return flat;
-    };
+    // Derived State: Current Path
+    const currentPath = useMemo(() => {
+        if (!folderId) return [];
+        return findPath(folderId, ORGANIZATION_DATA) || [];
+    }, [folderId]);
 
+    // Derived State: Current Folder Items or Search Results
     const displayedItems = useMemo(() => {
         if (searchTerm.trim()) {
-            const all = getAllItemsFlat();
-            return all.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
+            // Search Mode: Flatten All
+            const flatten = (items) => {
+                let flat = [];
+                for (const i of items) {
+                    flat.push(i);
+                    if (i.items) flat = [...flat, ...flatten(i.items)];
+                }
+                return flat;
+            };
+            return flatten(ORGANIZATION_DATA).filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()));
+        } else {
+            // Browse Mode
+            if (currentPath.length > 0) {
+                const currentFolder = currentPath[currentPath.length - 1];
+                return currentFolder.items || [];
+            }
+            return ORGANIZATION_DATA;
         }
-        return getCurrentItems();
     }, [currentPath, searchTerm]);
 
+    // Handlers
     const handleNavigate = (item) => {
         if (item.type === 'folder') {
-            setCurrentPath([...currentPath, item]);
-            setSearchTerm(""); // Clear search on navigation
+            setSearchParams({ folder: item.id });
+            setSearchTerm("");
         }
     };
 
-    const handleBreadcrumb = (index) => {
-        if (index === -1) {
-            setCurrentPath([]);
+    const handleBreadcrumb = (node) => {
+        if (!node) {
+            setSearchParams({}); // Root
         } else {
-            setCurrentPath(currentPath.slice(0, index + 1));
+            setSearchParams({ folder: node.id });
         }
     };
 
@@ -127,7 +138,7 @@ export default function DocumentExplorer() {
                                 placeholder="Search all files..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="glass-input pl-9 py-2 text-sm w-full"
+                                className="glass-input !pl-14 py-2 text-sm w-full"
                             />
                         </div>
                     </div>
@@ -145,8 +156,17 @@ export default function DocumentExplorer() {
                 {/* Bottom Bar: Breadcrumbs */}
                 {!searchTerm && (
                     <div className="flex items-center gap-2 text-sm text-gray-400 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
+                        {/* Back Button (Browser History) */}
                         <button
-                            onClick={() => handleBreadcrumb(-1)}
+                            onClick={() => window.history.back()}
+                            className="p-1 hover:text-white mr-2"
+                            title="Go Back"
+                        >
+                            <ArrowLeft className="w-4 h-4" />
+                        </button>
+
+                        <button
+                            onClick={() => handleBreadcrumb(null)}
                             className={`flex items-center gap-1 hover:text-white transition-colors ${currentPath.length === 0 ? 'text-white font-medium' : ''}`}
                         >
                             <Home className="w-4 h-4" />
@@ -157,7 +177,7 @@ export default function DocumentExplorer() {
                             <div key={folder.id} className="flex items-center gap-2">
                                 <ChevronRight className="w-4 h-4 text-gray-600" />
                                 <button
-                                    onClick={() => handleBreadcrumb(index)}
+                                    onClick={() => handleBreadcrumb(folder)}
                                     className={`hover:text-white transition-colors whitespace-nowrap ${index === currentPath.length - 1 ? 'text-white font-medium' : ''}`}
                                 >
                                     {folder.name}
