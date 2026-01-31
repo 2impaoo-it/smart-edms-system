@@ -48,15 +48,24 @@ body {
 }
 
 /* Glassmorphism Utilities */
-.glass {
+/* Moved .glass styles directly into composition or standalone use to avoid @apply errors */
+
+@layer utilities {
+    .glass {
+        background: rgba(17, 24, 39, 0.4);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+}
+
+/* Component Classes */
+.glass-card {
     background: rgba(17, 24, 39, 0.4);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.glass-card {
-    @apply glass rounded-2xl transition-all duration-300;
+    @apply rounded-2xl transition-all duration-300;
 }
 
 .glass-card:hover {
