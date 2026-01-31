@@ -264,14 +264,19 @@ const AdminDashboard = () => {
     );
 };
 
-// Import Manager Dashboard Lazily or Directly (assuming it exists based on plan)
+// Import Manager and User Dashboards logic
 import ManagerDashboard from "./ManagerDashboard";
+import UserDashboard from "./UserDashboard";
 
 export default function Dashboard() {
     const { user } = useAuth();
 
     if (user?.role === 'MANAGER') {
         return <ManagerDashboard />;
+    }
+
+    if (user?.role === 'USER') {
+        return <UserDashboard />;
     }
 
     return <AdminDashboard />;

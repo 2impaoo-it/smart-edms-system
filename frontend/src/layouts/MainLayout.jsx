@@ -1,11 +1,12 @@
-import { useState } from "react";
-import { Link, useLocation, Outlet } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useLocation, Outlet, Navigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     LayoutDashboard, Files, PenTool, Users, Settings,
     LogOut, Menu, X, Bell, Search, Shield
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useSocket } from "../context/SocketContext";
 import { cn } from "../libs/utils";
 
 const SidebarItem = ({ icon: Icon, label, path, active }) => (
@@ -24,8 +25,30 @@ const SidebarItem = ({ icon: Icon, label, path, active }) => (
 
 export default function MainLayout() {
     const { user, logout } = useAuth();
+    const { lastMessage, notifications, markAllAsRead } = useSocket();
     const location = useLocation();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+    // Notification UI State
+    const [showNotifMenu, setShowNotifMenu] = useState(false);
+
+    // Notification Toast State
+    const [toast, setToast] = useState(null);
+
+    // Watch for new socket messages
+    useEffect(() => {
+        if (lastMessage) {
+            setToast(lastMessage);
+            // Auto hide after 5s
+            const timer = setTimeout(() => setToast(null), 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [lastMessage]);
+
+    // Protect Route
+    if (!user) {
+        return <Navigate to="/login" state={{ from: location }} replace />;
+    }
 
     // Define navigation items based on Role
     const navItems = [
@@ -121,11 +144,63 @@ export default function MainLayout() {
                         <span className="text-white">{location.pathname === '/' ? 'Dashboard' : location.pathname.slice(1)}</span>
                     </div>
 
-                    <div className="flex items-center gap-4">
-                        <button className="relative p-2 text-gray-400 hover:text-white transition-colors">
+                    <div className="flex items-center gap-4 relative">
+                        <button
+                            onClick={() => {
+                                setShowNotifMenu(!showNotifMenu);
+                                if (!showNotifMenu && notifications.some(n => !n.read)) markAllAsRead();
+                            }}
+                            className="relative p-2 text-gray-400 hover:text-white transition-colors"
+                        >
                             <Bell className="w-5 h-5" />
-                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent rounded-full animate-pulse" />
+                            {notifications.some(n => !n.read) && (
+                                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent rounded-full animate-pulse" />
+                            )}
                         </button>
+
+                        {/* Notification Dropdown */}
+                        <AnimatePresence>
+                            {showNotifMenu && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                    className="absolute top-12 right-0 w-80 glass-card bg-[#1a1f2e] border border-white/10 shadow-2xl z-50 overflow-hidden"
+                                >
+                                    <div className="p-4 border-b border-white/5 flex justify-between items-center bg-black/20">
+                                        <h3 className="font-bold text-white text-sm">Notifications</h3>
+                                        <span className="text-xs text-gray-500">{notifications.length} recent</span>
+                                    </div>
+                                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                                        {notifications.length === 0 ? (
+                                            <div className="p-8 text-center text-gray-500 text-sm">
+                                                No notifications yet.
+                                            </div>
+                                        ) : (
+                                            <div className="divide-y divide-white/5">
+                                                {notifications.map(notif => (
+                                                    <div key={notif.id} className={`p-4 hover:bg-white/5 transition-colors ${!notif.read ? 'bg-primary/5' : ''}`}>
+                                                        <div className="flex gap-3">
+                                                            <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${notif.type === 'success' ? 'bg-success' :
+                                                                    notif.type === 'warning' ? 'bg-warning' : 'bg-primary'
+                                                                }`} />
+                                                            <div>
+                                                                <p className="text-sm font-medium text-gray-200">{notif.title}</p>
+                                                                <p className="text-xs text-gray-400 mt-1">{notif.msg}</p>
+                                                                <p className="text-[10px] text-gray-600 mt-2">{notif.timestamp}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="p-2 border-t border-white/5 bg-black/20 text-center">
+                                        <button className="text-xs text-primary hover:text-white transition-colors">View All Activities</button>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                 </header>
 
@@ -142,6 +217,31 @@ export default function MainLayout() {
                         <Outlet />
                     </motion.div>
                 </div>
+                {/* Real-time Notification Toast */}
+                <AnimatePresence>
+                    {toast && (
+                        <motion.div
+                            initial={{ x: 100, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            exit={{ x: 100, opacity: 0 }}
+                            className="fixed top-24 right-6 z-50 pointer-events-auto"
+                        >
+                            <div className="glass-card bg-[#1a1f2e] border-l-4 border-l-primary p-4 shadow-2xl min-w-[300px] flex items-start gap-3">
+                                <div className="p-2 bg-primary/20 rounded-full text-primary mt-1">
+                                    <Bell className="w-5 h-5" />
+                                </div>
+                                <div className="flex-1">
+                                    <div className="flex justify-between items-start">
+                                        <h4 className="font-bold text-white text-sm">{toast.title}</h4>
+                                        <button onClick={() => setToast(null)} className="text-gray-500 hover:text-white text-xs">&times;</button>
+                                    </div>
+                                    <p className="text-xs text-gray-400 mt-1 leading-relaxed">{toast.msg}</p>
+                                    <span className="text-[10px] text-gray-600 mt-2 block">{toast.timestamp}</span>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </main>
         </div>
     );

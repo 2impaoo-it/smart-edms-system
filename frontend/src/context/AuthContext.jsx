@@ -4,14 +4,20 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
     // Mock user for development - Change "role" to 'ADMIN', 'MANAGER', or 'EMPLOYEE' to test
-    const [user, setUser] = useState({
-        name: "Cyber User",
-        role: "MANAGER",
-        avatar: "https://i.pravatar.cc/150?u=cyber"
+    // Load user from localStorage if available
+    const [user, setUser] = useState(() => {
+        const savedUser = localStorage.getItem('user');
+        return savedUser ? JSON.parse(savedUser) : null;
     });
 
-    const login = (userData) => setUser(userData);
-    const logout = () => setUser(null);
+    const login = (userData) => {
+        localStorage.setItem('user', JSON.stringify(userData));
+        setUser(userData);
+    };
+    const logout = () => {
+        localStorage.removeItem('user');
+        setUser(null);
+    };
 
     // Define permissions based on role
     const permissions = {

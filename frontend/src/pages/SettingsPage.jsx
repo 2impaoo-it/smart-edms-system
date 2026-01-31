@@ -18,12 +18,17 @@ export default function SettingsPage() {
         setTimeout(() => setNotification(null), 3000);
     };
 
-    const tabs = [
+    const allTabs = [
         { id: "profile", label: "My Profile", icon: User },
         { id: "security", label: "Security", icon: Lock },
         { id: "notifications", label: "Notifications", icon: Bell },
         { id: "signature", label: "Digital Signature", icon: PenTool },
     ];
+
+    // Filter tabs: Users cannot sign, so remove Digital Signature tab
+    const tabs = user?.role === 'USER'
+        ? allTabs.filter(tab => tab.id !== 'signature')
+        : allTabs;
 
     return (
         <div className="max-w-6xl mx-auto space-y-6">

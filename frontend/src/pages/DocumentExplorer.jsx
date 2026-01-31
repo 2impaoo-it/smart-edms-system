@@ -70,6 +70,30 @@ const MANAGER_DOCS = [
     }
 ];
 
+// Mock User View Data (Employee)
+const USER_DOCS = [
+    {
+        id: 'manager-docs', name: "Manager Documents", type: "folder", modified: "1d ago", items: [
+            {
+                id: 'mgr-1', name: "Michael Scott (Sales)", type: "folder", modified: "2h ago", items: [
+                    { id: 'u-file-1', name: "Project_Proposal_v2.pdf", type: "pdf", size: "2.4 MB", modified: "1d ago", sender: "Me", status: "Pending" }
+                ]
+            },
+            {
+                id: 'mgr-2', name: "Sarah Connor (Operations)", type: "folder", modified: "5h ago", items: [
+                    { id: 'u-file-2', name: "Leave_Request.pdf", type: "pdf", size: "450 KB", modified: "5h ago", sender: "Me", status: "Approved" }
+                ]
+            }
+        ]
+    },
+    {
+        id: 'my-uploads', name: "My Uploads", type: "folder", modified: "10m ago", items: [
+            { id: 'u-file-3', name: "Draft_Ideas.txt", type: "txt", size: "12 KB", modified: "2d ago", sender: "Me" },
+            { id: 'u-file-4', name: "Personal_Notes.docx", type: "doc", size: "15 KB", modified: "5d ago", sender: "Me" }
+        ]
+    }
+];
+
 export default function DocumentExplorer() {
     const { user } = useAuth();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -83,7 +107,7 @@ export default function DocumentExplorer() {
     const fileInputRef = useRef(null);
 
     // Determine Base Data based on Role
-    const baseData = user.role === 'MANAGER' ? MANAGER_DOCS : ORGANIZATION_DATA;
+    const baseData = user.role === 'MANAGER' ? MANAGER_DOCS : user.role === 'USER' ? USER_DOCS : ORGANIZATION_DATA;
 
     // Recursive Helper to find path to a folder ID
     const findPath = (targetId, nodes, path = []) => {
