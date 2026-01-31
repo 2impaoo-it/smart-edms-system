@@ -6,7 +6,7 @@ export const AuthProvider = ({ children }) => {
     // Mock user for development - Change "role" to 'ADMIN', 'MANAGER', or 'EMPLOYEE' to test
     const [user, setUser] = useState({
         name: "Cyber User",
-        role: "ADMIN",
+        role: "MANAGER",
         avatar: "https://i.pravatar.cc/150?u=cyber"
     });
 

@@ -1,14 +1,14 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
     Folder, FileText, MoreVertical, Search, Plus,
-    Grid, List as ListIcon, Filter, Download, Share2, Trash2,
-    ChevronRight, Home, ArrowLeft
+    Grid, List as ListIcon, Download, Share2, Trash2,
+    ChevronRight, Home, ArrowLeft, UploadCloud, User
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 
-// Mock Organizational Data Structure
+// Mock Organizational Data (Admin View)
 const ORGANIZATION_DATA = [
     {
         id: 'dept-1', name: "IT Department", type: "folder", modified: "1d ago", items: [
@@ -16,13 +16,13 @@ const ORGANIZATION_DATA = [
                 id: 'mgr-1', name: "Manager Mike", type: "folder", modified: "2h ago", items: [
                     {
                         id: 'emp-1', name: "John Doe (Dev)", type: "folder", modified: "5m ago", items: [
-                            { id: 'file-1', name: "Backend_API_Specs.pdf", type: "pdf", size: "2.4 MB", modified: "1d ago" },
-                            { id: 'file-2', name: "Database_Schema.sql", type: "sql", size: "15 KB", modified: "2d ago" }
+                            { id: 'file-1', name: "Backend_API_Specs.pdf", type: "pdf", size: "2.4 MB", modified: "1d ago", sender: "John Doe" },
+                            { id: 'file-2', name: "Database_Schema.sql", type: "sql", size: "15 KB", modified: "2d ago", sender: "John Doe" }
                         ]
                     },
                     {
                         id: 'emp-2', name: "Alice Smith (QA)", type: "folder", modified: "1h ago", items: [
-                            { id: 'file-3', name: "Test_Plan_v2.docx", type: "doc", size: "1.1 MB", modified: "3h ago" }
+                            { id: 'file-3', name: "Test_Plan_v2.docx", type: "doc", size: "1.1 MB", modified: "3h ago", sender: "Alice Smith" }
                         ]
                     }
                 ]
@@ -35,14 +35,39 @@ const ORGANIZATION_DATA = [
                 id: 'mgr-2', name: "Sarah Connor", type: "folder", modified: "3d ago", items: [
                     {
                         id: 'emp-3', name: "Emily Blunt (Recruiter)", type: "folder", modified: "4d ago", items: [
-                            { id: 'file-4', name: "Candidate_CVs.zip", type: "zip", size: "45 MB", modified: "4d ago" }
+                            { id: 'file-4', name: "Candidate_CVs.zip", type: "zip", size: "45 MB", modified: "4d ago", sender: "Emily Blunt" }
                         ]
                     }
                 ]
             }
         ]
     },
-    { id: 'file-root', name: "Company_Policy.pdf", type: "pdf", size: "3.2 MB", modified: "1 month ago" }
+    { id: 'file-root', name: "Company_Policy.pdf", type: "pdf", size: "3.2 MB", modified: "1 month ago", sender: "Admin" }
+];
+
+// Mock Manager View Data
+const MANAGER_DOCS = [
+    {
+        id: 'inbox', name: "Inbox (Staff Submissions)", type: "folder", modified: "Just now", items: [
+            {
+                id: 'staff-1', name: "John Doe (Dev)", type: "folder", modified: "2h ago", items: [
+                    { id: 'm-file-1', name: "Weekly_Report_Q4.pdf", type: "pdf", size: "1.2 MB", modified: "2h ago", sender: "John Doe" },
+                    { id: 'm-file-2', name: "Leave_Request.pdf", type: "pdf", size: "450 KB", modified: "5h ago", sender: "John Doe" }
+                ]
+            },
+            {
+                id: 'staff-2', name: "Alice Smith (QA)", type: "folder", modified: "1d ago", items: [
+                    { id: 'm-file-3', name: "Bug_Report_Major.xlsx", type: "xls", size: "3.5 MB", modified: "1d ago", sender: "Alice Smith" }
+                ]
+            }
+        ]
+    },
+    {
+        id: 'my-uploads', name: "My Uploads", type: "folder", modified: "10m ago", items: [
+            { id: 'm-file-4', name: "Team_Strategy_2025.pptx", type: "ppt", size: "12 MB", modified: "2d ago", sender: "Me" },
+            { id: 'm-file-5', name: "Meeting_Minutes.docx", type: "doc", size: "15 KB", modified: "5d ago", sender: "Me" }
+        ]
+    }
 ];
 
 export default function DocumentExplorer() {
@@ -53,6 +78,12 @@ export default function DocumentExplorer() {
     const [viewMode, setViewMode] = useState("grid");
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedDocs, setSelectedDocs] = useState([]);
+
+    // File Upload Ref
+    const fileInputRef = useRef(null);
+
+    // Determine Base Data based on Role
+    const baseData = user.role === 'MANAGER' ? MANAGER_DOCS : ORGANIZATION_DATA;
 
     // Recursive Helper to find path to a folder ID
     const findPath = (targetId, nodes, path = []) => {
@@ -69,8 +100,8 @@ export default function DocumentExplorer() {
     // Derived State: Current Path
     const currentPath = useMemo(() => {
         if (!folderId) return [];
-        return findPath(folderId, ORGANIZATION_DATA) || [];
-    }, [folderId]);
+        return findPath(folderId, baseData) || [];
+    }, [folderId, baseData]);
 
     // Derived State: Current Folder Items or Search Results
     const displayedItems = useMemo(() => {
@@ -84,16 +115,16 @@ export default function DocumentExplorer() {
                 }
                 return flat;
             };
-            return flatten(ORGANIZATION_DATA).filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()));
+            return flatten(baseData).filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()));
         } else {
             // Browse Mode
             if (currentPath.length > 0) {
                 const currentFolder = currentPath[currentPath.length - 1];
                 return currentFolder.items || [];
             }
-            return ORGANIZATION_DATA;
+            return baseData;
         }
-    }, [currentPath, searchTerm]);
+    }, [currentPath, searchTerm, baseData]);
 
     // Handlers
     const handleNavigate = (item) => {
@@ -115,6 +146,19 @@ export default function DocumentExplorer() {
         setSelectedDocs(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     };
 
+    // Mock Upload Handler
+    const handleUploadClick = () => {
+        fileInputRef.current.click();
+    };
+
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            alert(`Simulated Upload: ${file.name} to ${currentPath.length > 0 ? currentPath[currentPath.length - 1].name : 'Root'}`);
+            // In a real app, we would upload to API and refresh list
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* Toolbar */}
@@ -123,11 +167,22 @@ export default function DocumentExplorer() {
                 {/* Top Bar: Actions & Search */}
                 <div className="flex flex-col md:flex-row justify-between gap-4">
                     <div className="flex items-center gap-3 w-full md:w-auto">
-                        {/* Admin Restriction: No Upload */}
+                        {/* Manager & Employee: Upload Button */}
                         {user.role !== 'ADMIN' && (
-                            <button className="glass-btn glass-btn-primary flex items-center gap-2 text-sm px-4 py-2">
-                                <Plus className="w-4 h-4" /> New Upload
-                            </button>
+                            <>
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    className="hidden"
+                                    onChange={handleFileChange}
+                                />
+                                <button
+                                    onClick={handleUploadClick}
+                                    className="glass-btn glass-btn-primary flex items-center gap-2 text-sm px-4 py-2"
+                                >
+                                    <UploadCloud className="w-4 h-4" /> New Upload
+                                </button>
+                            </>
                         )}
 
                         {/* Search */}
@@ -135,7 +190,7 @@ export default function DocumentExplorer() {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                             <input
                                 type="text"
-                                placeholder="Search all files..."
+                                placeholder="Search files..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="glass-input !pl-14 py-2 text-sm w-full"
@@ -238,6 +293,12 @@ export default function DocumentExplorer() {
                                     <span>•</span>
                                     <span>{doc.modified}</span>
                                 </div>
+                                {doc.sender && user.role === 'MANAGER' && (
+                                    <div className="flex items-center gap-1 text-xs text-primary mt-1">
+                                        <User className="w-3 h-3" />
+                                        <span>{doc.sender}</span>
+                                    </div>
+                                )}
                             </div>
                         </motion.div>
                     ))}

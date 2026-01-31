@@ -44,7 +44,7 @@ const StatCard = ({ title, value, change, icon: Icon }) => (
     </div>
 );
 
-export default function Dashboard() {
+const AdminDashboard = () => {
     const { user } = useAuth();
 
     // State
@@ -249,7 +249,7 @@ export default function Dashboard() {
                                         </div>
                                     </div>
                                     <span className={`text-xs px-2 py-1 rounded-full ${file.status === 'Signed' ? 'bg-success/20 text-success' :
-                                            file.status === 'Pending' ? 'bg-warning/20 text-warning' : 'bg-primary/20 text-primary'
+                                        file.status === 'Pending' ? 'bg-warning/20 text-warning' : 'bg-primary/20 text-primary'
                                         }`}>
                                         {file.status}
                                     </span>
@@ -262,4 +262,17 @@ export default function Dashboard() {
             </div>
         </div>
     );
+};
+
+// Import Manager Dashboard Lazily or Directly (assuming it exists based on plan)
+import ManagerDashboard from "./ManagerDashboard";
+
+export default function Dashboard() {
+    const { user } = useAuth();
+
+    if (user?.role === 'MANAGER') {
+        return <ManagerDashboard />;
+    }
+
+    return <AdminDashboard />;
 }

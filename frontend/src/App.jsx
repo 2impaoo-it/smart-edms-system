@@ -4,7 +4,9 @@ import MainLayout from "./layouts/MainLayout";
 import Dashboard from "./pages/Dashboard";
 import DocumentExplorer from "./pages/DocumentExplorer";
 import UserManagement from "./pages/UserManagement";
-import { SettingsPage, SigningQueuePage } from "./pages/Placeholders";
+import { DocumentsPage, UsersPage } from './pages/Placeholders';
+import SigningQueuePage from './pages/SigningQueue';
+import SettingsPage from './pages/SettingsPage';
 
 export default function App() {
   return (
