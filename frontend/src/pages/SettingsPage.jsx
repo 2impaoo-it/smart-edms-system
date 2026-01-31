@@ -257,10 +257,16 @@ function NotificationSettings({ showNotification }) {
 
 // 4. Signature Canvas Component
 function SignatureSettings({ showNotification }) {
+    const { signature, updateSignature } = useAuth(); // Get signature and update function from context
     const canvasRef = useRef(null);
     const [isDrawing, setIsDrawing] = useState(false);
-    const [signatureMethod, setSignatureMethod] = useState("draw"); // 'draw' | 'upload'
-    const [uploadedImage, setUploadedImage] = useState(null);
+
+    // Default to 'upload' mode if a signature exists, so we can show the preview
+    const [signatureMethod, setSignatureMethod] = useState(signature ? "upload" : "draw");
+
+    // Initialize loaded image with the existing signature from context
+    const [uploadedImage, setUploadedImage] = useState(signature || null);
+
     const [hasDrawnSignature, setHasDrawnSignature] = useState(false);
 
     useEffect(() => {
@@ -274,6 +280,18 @@ function SignatureSettings({ showNotification }) {
             }
         }
     }, [signatureMethod]);
+
+    // Update local state if context signature changes (e.g. key cleared elsewhere)
+    useEffect(() => {
+        console.log("Context Signature Changed:", signature);
+        if (signature) {
+            setUploadedImage(signature);
+            setSignatureMethod('upload'); // Switch to view mode
+        } else {
+            setUploadedImage(null);
+            // Optional: switch back to draw or stay in upload but empty
+        }
+    }, [signature]);
 
     // Drawing Handlers
     const startDrawing = (e) => {
@@ -337,11 +355,25 @@ function SignatureSettings({ showNotification }) {
         setUploadedImage(null);
     };
 
+    const handleDeleteSignature = () => {
+        if (confirm("Are you sure you want to remove your digital signature?")) {
+            updateSignature(null);
+            setUploadedImage(null);
+            setSignatureMethod('draw'); // Reset to draw mode
+            showNotification("Signature removed.", "info");
+        }
+    };
+
     const saveSignature = () => {
         if (signatureMethod === 'draw' && !hasDrawnSignature) return;
         if (signatureMethod === 'upload' && !uploadedImage) return;
 
-        // Logic to save (e.g., convert canvas to blob or send uploaded image)
+        // Save logic
+        const signatureData = signatureMethod === 'draw'
+            ? canvasRef.current.toDataURL()
+            : uploadedImage;
+
+        updateSignature(signatureData);
         showNotification("Digital signature saved successfully!");
     };
 
@@ -367,7 +399,7 @@ function SignatureSettings({ showNotification }) {
                         className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${signatureMethod === 'upload' ? 'bg-primary text-white shadow-lg' : 'text-gray-400 hover:text-white'
                             }`}
                     >
-                        <Camera className="w-4 h-4" /> Upload
+                        <Camera className="w-4 h-4" /> Upload / View
                     </button>
                 </div>
             </div>
@@ -452,17 +484,19 @@ function SignatureSettings({ showNotification }) {
                             </div>
                             <div className="flex gap-4">
                                 <button
-                                    onClick={clearUpload}
-                                    className="glass-btn bg-white/5 hover:bg-white/10 border border-white/10 text-white"
+                                    onClick={handleDeleteSignature}
+                                    className="glass-btn bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-500 font-medium px-4 py-2"
                                 >
-                                    Remove
+                                    Delete Signature
                                 </button>
-                                <button
-                                    onClick={saveSignature}
-                                    className="glass-btn glass-btn-primary flex items-center gap-2"
-                                >
-                                    <Save className="w-4 h-4" /> Save Signature
-                                </button>
+                                {uploadedImage !== signature && (
+                                    <button
+                                        onClick={saveSignature}
+                                        className="glass-btn glass-btn-primary flex items-center gap-2"
+                                    >
+                                        <Save className="w-4 h-4" /> Save Signature
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}

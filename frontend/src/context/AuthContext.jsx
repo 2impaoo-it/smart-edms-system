@@ -20,8 +20,20 @@ export const AuthProvider = ({ children }) => {
         canUpload: true, // Everyone can upload
     };
 
+    // Signature State
+    const [signature, setSignature] = useState(localStorage.getItem('userSignature'));
+
+    const updateSignature = (newSig) => {
+        if (newSig) {
+            localStorage.setItem('userSignature', newSig);
+        } else {
+            localStorage.removeItem('userSignature');
+        }
+        setSignature(newSig);
+    };
+
     return (
-        <AuthContext.Provider value={{ user, login, logout, permissions }}>
+        <AuthContext.Provider value={{ user, login, logout, permissions, signature, updateSignature }}>
             {children}
         </AuthContext.Provider>
     );
