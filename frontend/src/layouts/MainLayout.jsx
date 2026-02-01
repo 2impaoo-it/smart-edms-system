@@ -100,7 +100,7 @@ export default function MainLayout() {
                 <div className="px-4 py-2">
                     <div className="glass-input flex items-center gap-2 px-3 py-2 text-sm">
                         <Search className="w-4 h-4 text-gray-500" />
-                        <input type="text" placeholder="Quick search..." className="bg-transparent border-none outline-none text-white placeholder-gray-600 w-full" />
+                        <input type="text" placeholder="Quick search..." aria-label="Search documents" className="bg-transparent border-none outline-none text-white placeholder-gray-600 w-full" />
                     </div>
                 </div>
 
@@ -117,12 +117,12 @@ export default function MainLayout() {
 
                 <div className="p-4 border-t border-white/5 bg-black/20">
                     <div className="flex items-center gap-3 px-2 mb-4">
-                        <img src={user?.avatar} alt="User" className="w-10 h-10 rounded-full border-2 border-primary/50" />
+                        <img src={user?.avatar} alt={`Avatar of ${user?.name || 'User'}`} className="w-10 h-10 rounded-full border-2 border-primary/50" />
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{user?.name}</p>
                             <p className="text-xs text-gray-400 truncate capitalize">{user?.role?.toLowerCase()}</p>
                         </div>
-                        <button onClick={logout} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-red-400">
+                        <button onClick={logout} aria-label="Logout" className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-red-400">
                             <LogOut className="w-5 h-5" />
                         </button>
                     </div>
@@ -134,7 +134,7 @@ export default function MainLayout() {
 
                 {/* Header */}
                 <header className="h-16 border-b border-white/5 bg-background/50 backdrop-blur-md sticky top-0 z-30 flex items-center justify-between px-4 md:px-8">
-                    <button onClick={() => setMobileMenuOpen(true)} className="md:hidden p-2 text-gray-400">
+                    <button onClick={() => setMobileMenuOpen(true)} aria-label="Open menu" className="md:hidden p-2 text-gray-400">
                         <Menu className="w-6 h-6" />
                     </button>
 
@@ -150,6 +150,7 @@ export default function MainLayout() {
                                 setShowNotifMenu(!showNotifMenu);
                                 if (!showNotifMenu && notifications.some(n => !n.read)) markAllAsRead();
                             }}
+                            aria-label={`Notifications ${notifications.filter(n => !n.read).length > 0 ? '(New)' : ''}`}
                             className="relative p-2 text-gray-400 hover:text-white transition-colors"
                         >
                             <Bell className="w-5 h-5" />
@@ -182,7 +183,7 @@ export default function MainLayout() {
                                                     <div key={notif.id} className={`p-4 hover:bg-white/5 transition-colors ${!notif.read ? 'bg-primary/5' : ''}`}>
                                                         <div className="flex gap-3">
                                                             <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${notif.type === 'success' ? 'bg-success' :
-                                                                    notif.type === 'warning' ? 'bg-warning' : 'bg-primary'
+                                                                notif.type === 'warning' ? 'bg-warning' : 'bg-primary'
                                                                 }`} />
                                                             <div>
                                                                 <p className="text-sm font-medium text-gray-200">{notif.title}</p>
@@ -233,7 +234,7 @@ export default function MainLayout() {
                                 <div className="flex-1">
                                     <div className="flex justify-between items-start">
                                         <h4 className="font-bold text-white text-sm">{toast.title}</h4>
-                                        <button onClick={() => setToast(null)} className="text-gray-500 hover:text-white text-xs">&times;</button>
+                                        <button onClick={() => setToast(null)} aria-label="Dismiss notification" className="text-gray-500 hover:text-white text-xs">&times;</button>
                                     </div>
                                     <p className="text-xs text-gray-400 mt-1 leading-relaxed">{toast.msg}</p>
                                     <span className="text-[10px] text-gray-600 mt-2 block">{toast.timestamp}</span>
