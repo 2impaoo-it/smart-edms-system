@@ -53,7 +53,8 @@ public class JwtUtils {
     public List<String> getRolesFromToken(String token) {
         Claims claims = Jwts.parser().verifyWith(key).build()
                 .parseSignedClaims(token).getPayload();
-        return claims.get("roles", List.class);
+        List<String> roles = claims.get("roles", List.class);
+        return roles != null ? roles : List.of();
     }
 
     public boolean validateToken(String token) {

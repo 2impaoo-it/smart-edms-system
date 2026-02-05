@@ -56,8 +56,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     .map(SimpleGrantedAuthority::new)
                     .collect(Collectors.toList());
 
+            // Sử dụng password placeholder an toàn vì authentication dựa trên token đã validated
             UserDetails userDetails = User.withUsername(username)
-                    .password("") // Password không cần thiết cho authentication từ token
+                    .password("{noop}") // Password không được sử dụng cho authentication từ token
                     .authorities(authorities)
                     .build();
 
