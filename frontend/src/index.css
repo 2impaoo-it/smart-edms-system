@@ -1,68 +1,87 @@
+@import "tailwindcss";
+
+@theme {
+  --font-size: 16px;
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  
+  /* Light Mode - High Contrast Color System */
+  --color-background: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-glass: rgba(255, 255, 255, 0.9);
+  --color-primary-glow-start: #6366f1;
+  --color-primary-glow-end: #a855f7;
+  
+  --color-foreground: #0f172a;
+  --color-card: #ffffff;
+  --color-card-foreground: #0f172a;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0f172a;
+  --color-primary: #6366f1;
+  --color-primary-foreground: #ffffff;
+  --color-primary-from: #6366f1;
+  --color-primary-to: #a855f7;
+  --color-secondary: #f1f5f9;
+  --color-secondary-foreground: #0f172a;
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b;
+  --color-accent: #a855f7;
+  --color-accent-foreground: #ffffff;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+  --color-border: rgba(15, 23, 42, 0.15);
+  --color-input: rgba(15, 23, 42, 0.1);
+  --color-input-background: #ffffff;
+  --color-switch-background: #cbd5e1;
+  --color-ring: rgba(99, 102, 241, 0.5);
+  
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+}
+
+@custom-variant dark (&:is(.dark *));
+
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
   color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+.dark {
+  /* Dark Mode - Cyberpunk Dark Color System */
+  --color-background: #030712;
+  --color-surface: #111827;
+  --color-surface-glass: rgba(17, 24, 39, 0.4);
+  
+  --color-foreground: #f9fafb;
+  --color-card: #111827;
+  --color-card-foreground: #f9fafb;
+  --color-popover: #1f2937;
+  --color-popover-foreground: #f9fafb;
+  --color-primary: #6366f1;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #1f2937;
+  --color-secondary-foreground: #f9fafb;
+  --color-muted: #374151;
+  --color-muted-foreground: #9ca3af;
+  --color-accent: #a855f7;
+  --color-accent-foreground: #ffffff;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-input: rgba(255, 255, 255, 0.05);
+  --color-input-background: rgba(255, 255, 255, 0.05);
+  --color-switch-background: #374151;
+  --color-ring: rgba(99, 102, 241, 0.5);
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+@layer base {
+  * {
+    border-color: var(--color-border);
   }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-family);
   }
 }
