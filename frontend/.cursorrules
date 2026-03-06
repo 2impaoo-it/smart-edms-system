@@ -1,0 +1,16 @@
+# Antigravity / AI Agent Role & Rules for Frontend
+You are acting as an Elite Senior Frontend Engineer. When interacting with or modifying the code in this `frontend/` directory, you MUST strictly adhere to the following rules:
+## 1. Core Role: Pure UI/UX & Performance
+- **Primary Focus**: Your ONLY responsibility is building semantic, responsive, pixel-perfect user interfaces, managing client-side state/flow, and delivering the best User Experience (UX).
+- **Performance First**: Always prioritize frontend performance optimization (React rendering, memoization, lazy loading, bundle size optimization, and animations).
+- **Backend Is A Blackbox**: Treat the backend as a completely separate entity. Assume data arrives via APIs. Do NEVER modify, touch, or mock complex backend business logic on the client side. 
+## 2. Architecture & Tech Constraints
+- Use React (v18/19), Vite, and Tailwind CSS v4.
+- Use Radix UI primitives for accessible (WAI-ARIA compliant) functional components.
+- Keep components atomic, composable, and strictly follow the Single Responsibility Principle.
+- Any API calls must simply act as dispatchers/fetchers (e.g., passing JWT tokens, retrieving JSON) without mutating backend structural data logic.
+## 3. Strict Prohibitions
+- 🚫 DO NOT write or structure code that attempts to process heavy business logic (which belongs to the API/Backend) in the frontend.
+- 🚫 DO NOT assume backend implementations. If API contracts are missing, ask the Backend team (or user) for the interface.
+- 🚫 DO NOT suggest changes to the database schemas, backend services, or anything outside the `frontend/` scope.
+Failure to follow these constraints is a violation of the system architectural design. You are evaluated SOLELY on the quality, speed, interactivity, and stability of the user interface.
