@@ -1,7 +1,9 @@
 import { createBrowserRouter, RouterProvider, Navigate } from "react-router";
 import { Login } from "./pages/Login";
 import { MainLayout } from "./components/layout/MainLayout";
-
+// Import các trang cần thiết
+import { FileExplorer } from "./pages/FileExplorer";
+import { PlaceholderPage } from "./pages/PlaceholderPage";
 const router = createBrowserRouter([
     {
         path: "/",
@@ -13,43 +15,43 @@ const router = createBrowserRouter([
         children: [
             {
                 index: true,
-                element: null, // MainLayout will handle the role-based dashboard if path is /dashboard
+                element: <PlaceholderPage title="Dashboard Tổng quan" />,
             },
             {
                 path: "files",
-                element: null, // Handled in MainLayout renderContent
+                element: <FileExplorer />, // Dành riêng spotlight cho task EDMS-50
             },
             {
                 path: "department",
-                element: null, // Handled in MainLayout renderContent
+                element: <PlaceholderPage title="Quản lý Phòng ban" />,
             },
             {
                 path: "recycle-bin",
-                element: null,
+                element: <PlaceholderPage title="Thùng rác" />,
             },
             {
                 path: "audit-logs",
-                element: null, // Handled in MainLayout renderContent
+                element: <PlaceholderPage title="Nhật ký Hệ thống (Audit Logs)" />,
             },
             {
                 path: "approvals",
-                element: null, 
+                element: <PlaceholderPage title="Quản lý Phê duyệt" />,
             },
             {
                 path: "signatures",
-                element: null,
+                element: <PlaceholderPage title="Quản lý Chữ ký" />,
             },
             {
                 path: "users",
-                element: null,
+                element: <PlaceholderPage title="Quản lý Người dùng" />,
             },
             {
                 path: "storage",
-                element: null,
+                element: <PlaceholderPage title="Quản lý Lưu trữ" />,
             },
             {
                 path: "settings",
-                element: null,
+                element: <PlaceholderPage title="Cài đặt Hệ thống" />,
             },
         ]
     },
@@ -62,5 +64,4 @@ const router = createBrowserRouter([
 function App() {
     return <RouterProvider router={router} />;
 }
-
 export default App;

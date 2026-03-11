@@ -104,7 +104,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
     }, [currentFolderId]);
 
     const currentFiles = useMemo(() => {
-        return files.filter(f => {
+        const filtered = files.filter(f => {
             if (f.isDeleted) return false;
             const matchesParent = f.parentId === currentFolderId;
             
@@ -121,6 +121,13 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
             }
             
             return matchesParent;
+        });
+
+        // Sort: Folders first, then files
+        return filtered.sort((a, b) => {
+            if (a.type === 'folder' && b.type !== 'folder') return -1;
+            if (a.type !== 'folder' && b.type === 'folder') return 1;
+            return 0;
         });
     }, [currentFolderId, ownerId, user, title, files]);
 
