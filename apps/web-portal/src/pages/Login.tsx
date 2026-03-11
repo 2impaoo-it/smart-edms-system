@@ -1,17 +1,35 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  FileText,
-  Lock,
   Mail,
-  Shield,
-  Sparkles,
+  Lock,
   Eye,
   EyeOff,
-  ArrowRight,
-  Zap,
+  
   Loader2,
+  Cpu,
+  Shield,
+  Zap,
+  Fingerprint,
+  AlertCircle,
+  X,
+  CheckCircle2,
+  ShieldAlert,
+  KeyRound,
+  History
 } from "lucide-react";
+import { cn } from "../lib/utils";
+
+// --- Types ---
+type NotificationType = 'error' | 'success' | 'warning' | 'info';
+
+interface Notification {
+  id: string;
+  message: string;
+  type: NotificationType;
+}
 
 export function Login() {
   const navigate = useNavigate();
@@ -20,252 +38,323 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // States for Notifications & Modals
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  // Helper to add notification
+  const notify = (message: string, type: NotificationType = 'error') => {
+    const id = Math.random().toString(36).substring(7);
+    setNotifications(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 5000);
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    try {
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
-      const resp = await fetch(`${apiUrl}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!resp.ok) {
-        const text = await resp.text();
-        throw new Error(text || `Login failed: ${resp.status}`);
-      }
-
-      const data = await resp.json();
-      // Save token and auth flag
-      if (data && data.token) {
-        sessionStorage.setItem("authToken", data.token);
-        sessionStorage.setItem("isAuthenticated", "true");
-        navigate("/dashboard");
-      } else {
-        throw new Error("Invalid login response");
-      }
-    } catch (err: any) {
-      // Minimal error handling: show alert (can be replaced with UI feedback)
-      alert(err.message || "Login failed");
-    } finally {
+    // --- MOCK LOGIC FOR DEMONSTRATION ---
+    setTimeout(() => {
       setIsLoading(false);
+
+      if (email === "maintenance@edms.com") {
+        notify("Hệ thống hiện đang bảo trì định kỳ. Vui lòng quay lại sau 2h.", "warning");
+        return;
+      }
+
+      if (email === "wrong@edms.com") {
+        notify("Tên đăng nhập hoặc mật khẩu không chính xác. Vui lòng thử lại.", "error");
+        return;
+      }
+
+      if (email === "first@edms.com") {
+        setShowPasswordChange(true); // Trigger popup for first-time login
+        return;
+      }
+
+      // Default successful login
+      notify("Đăng nhập thành công! Đang chuyển hướng...", "success");
+      setTimeout(() => navigate("/dashboard"), 1000);
+    }, 1500);
+  };
+
+  const handlePasswordChange = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      notify("Mật khẩu xác nhận không khớp.", "error");
+      return;
     }
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+      setShowPasswordChange(false);
+      notify("Đổi mật khẩu thành công. Chào mừng bạn!", "success");
+      setTimeout(() => navigate("/dashboard"), 1000);
+    }, 1500);
   };
 
   return (
-    <div className="min-h-screen bg-background overflow-hidden relative">
-      {/* Gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+    <div className="min-h-screen bg-background overflow-hidden relative selection:bg-primary/20 selection:text-primary">
+      {/* Background & Grid */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-primary/10 blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-secondary/10 blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(99,102,241,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(99,102,241,0.03)_1px,transparent_1px)] bg-[size:3rem_3rem]" />
+      </div>
 
-      {/* Grid pattern */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(99,102,241,0.1)_1px,transparent_1px),linear-gradient(to_bottom,rgba(99,102,241,0.1)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#111827_1px,transparent_1px),linear-gradient(to_bottom,#111827_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)]" />
+      {/* --- Notification Toast System --- */}
+      <div className="fixed top-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none">
+        <AnimatePresence>
+          {notifications.map((n) => (
+            <motion.div
+              key={n.id}
+              initial={{ opacity: 0, x: 50, scale: 0.9 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 20, scale: 0.95 }}
+              className={cn(
+                "pointer-events-auto flex items-center gap-3 px-5 py-4 rounded-2xl glass-panel shadow-2xl border-white/60 min-w-[320px]",
+                n.type === 'error' && "border-l-4 border-l-destructive",
+                n.type === 'success' && "border-l-4 border-l-success",
+                n.type === 'warning' && "border-l-4 border-l-warning",
+                n.type === 'info' && "border-l-4 border-l-primary"
+              )}
+            >
+              {n.type === 'error' && <ShieldAlert className="w-5 h-5 text-destructive" />}
+              {n.type === 'success' && <CheckCircle2 className="w-5 h-5 text-success" />}
+              {n.type === 'warning' && <AlertCircle className="w-5 h-5 text-warning" />}
+              {n.type === 'info' && <AlertCircle className="w-5 h-5 text-primary" />}
 
-      {/* Radial glow */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-primary/10 dark:bg-primary/15 rounded-full blur-[120px] opacity-40" />
+              <div className="flex-1">
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-0.5">Thông báo hệ thống</p>
+                <p className="text-sm font-bold text-foreground/90">{n.message}</p>
+              </div>
 
-      {/* Content container */}
+              <button onClick={() => setNotifications(prev => prev.filter(item => item.id !== n.id))} className="p-1 hover:bg-black/5 rounded-lg transition-colors">
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
       <div className="relative z-10 min-h-screen flex items-center justify-center p-6">
-        <div className="w-full max-w-6xl grid lg:grid-cols-2 gap-12 items-center">
-          {/* Left side - Branding */}
-          <div className="hidden lg:block">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary to-accent rounded-2xl blur-xl opacity-50" />
-                <div className="relative w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-2xl flex items-center justify-center">
-                  <FileText className="w-8 h-8 text-white" />
-                </div>
+        <div className="w-full max-w-6xl grid lg:grid-cols-2 gap-20 items-center">
+
+          {/* Branding Section (Left) */}
+          <div className="hidden lg:block space-y-10">
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-4"
+            >
+              <div className="w-16 h-16 rounded-2xl cyber-gradient flex items-center justify-center shadow-neon ring-4 ring-white/50">
+                <Cpu className="w-9 h-9 text-white" />
               </div>
               <div>
-                <h1 className="text-4xl font-bold text-foreground">E-DMS</h1>
-                <p className="text-sm text-muted-foreground">
-                  Enterprise Document Management
-                </p>
+                <h1 className="text-4xl font-black tracking-tighter gradient-text">SMART EDMS</h1>
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em]">Secure Enterprise Storage</p>
               </div>
-            </div>
+            </motion.div>
 
-            <h2 className="text-5xl font-bold mb-6 leading-tight">
-              <span className="text-foreground">The Ferrari of</span>
-              <br />
-              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Document Management
-              </span>
-            </h2>
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              className="space-y-6"
+            >
+              <h2 className="text-6xl font-black leading-[0.9] tracking-tighter">
+                QUẢN TRỊ <br />
+                <span className="gradient-text">KHO SỐ</span> <br />
+                THÔNG MINH.
+              </h2>
+              <p className="text-lg text-muted-foreground font-medium max-w-md">
+                Tổ chức, ký duyệt và lưu trữ tài liệu doanh nghiệp trên một nền tảng Real-time duy nhất.
+              </p>
+            </motion.div>
 
-            <p className="text-lg text-muted-foreground mb-12 leading-relaxed">
-              Experience luxury-grade document control with holographic
-              interfaces, blockchain verification, and lightning-fast
-              performance designed for C-level executives.
-            </p>
-
-            {/* Feature highlights */}
-            <div className="space-y-4">
+            <div className="flex flex-wrap gap-3">
               {[
-                { icon: Shield, text: "Blockchain-verified signatures" },
-                { icon: Zap, text: "Real-time synchronization" },
-                { icon: Sparkles, text: "AI-powered document analysis" },
-              ].map((feature, index) => (
-                <div key={index} className="flex items-center gap-3 group">
-                  <div className="w-10 h-10 rounded-xl bg-surface border border-border flex items-center justify-center group-hover:border-primary/50 transition-colors">
-                    <feature.icon className="w-5 h-5 text-primary" />
-                  </div>
-                  <span className="text-foreground/80 group-hover:text-foreground transition-colors font-medium">
-                    {feature.text}
-                  </span>
-                </div>
+                { icon: Shield, text: "Ký số bảo mật" },
+                { icon: Zap, text: "Xử lý Realtime" },
+                { icon: Fingerprint, text: "Bảo mật đa lớp" },
+              ].map((f, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.4 + i * 0.1 }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl glass-panel border-white/40 text-xs font-bold text-muted-foreground shadow-sm"
+                >
+                  <f.icon className="w-4 h-4 text-primary" />
+                  {f.text}
+                </motion.div>
               ))}
             </div>
           </div>
 
-          {/* Right side - Login card */}
-          <div className="relative">
-            {/* Decorative glow */}
-            <div className="absolute -inset-4 bg-gradient-to-br from-primary/15 to-accent/15 rounded-3xl blur-3xl opacity-40" />
+          {/* Login Card (Right) */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative group"
+          >
+            <div className="absolute -inset-1 bg-gradient-to-r from-primary to-secondary rounded-[32px] blur opacity-20 group-hover:opacity-30 transition duration-1000" />
 
-            {/* Login card */}
-            <div className="relative bg-surface/95 dark:bg-surface/40 backdrop-blur-2xl border-2 border-border rounded-3xl p-8 lg:p-10 shadow-2xl">
-              {/* Mobile logo */}
-              <div className="lg:hidden flex items-center gap-3 mb-8">
-                <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center">
-                  <FileText className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-foreground">E-DMS</h1>
-                  <p className="text-xs text-muted-foreground">
-                    Enterprise Document Management
-                  </p>
-                </div>
+            <div className="relative glass-panel rounded-[32px] p-10 lg:p-12 border-white/60 shadow-2xl">
+              <div className="mb-10">
+                <h3 className="text-3xl font-black tracking-tight mb-2">Đăng nhập</h3>
+                <p className="text-sm font-medium text-muted-foreground">Sử dụng tài khoản nội bộ để tiếp tục</p>
               </div>
 
-              {/* Header */}
-              <div className="mb-8">
-                <h3 className="text-3xl font-bold text-foreground mb-2">
-                  Welcome back
-                </h3>
-                <p className="text-muted-foreground">
-                  Sign in to access your document vault
-                </p>
-              </div>
-
-              {/* Login form */}
               <form onSubmit={handleLogin} className="space-y-6">
-                {/* Email input */}
-                <div>
-                  <label
-                    htmlFor="email"
-                    className="block text-sm font-semibold text-foreground mb-2"
-                  >
-                    Email address
-                  </label>
-                  <div className="relative flex items-center">
-                    <Mail className="absolute left-4 w-5 h-5 text-muted-foreground" />
+                {/* Email Field */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Email Tài Khoản</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <input
-                      id="email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      className="w-full bg-background border-2 border-border rounded-xl px-12 py-3.5 text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary transition-colors font-medium"
-                      placeholder="your.email@company.com"
+                      placeholder="name@company.com"
+                      className="w-full bg-white/50 border border-white/40 rounded-2xl px-12 py-4 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all"
                     />
                   </div>
                 </div>
 
-                {/* Password input */}
-                <div>
-                  <label
-                    htmlFor="password"
-                    className="block text-sm font-semibold text-foreground mb-2"
-                  >
-                    Password
-                  </label>
-                  <div className="relative flex items-center">
-                    <Lock className="absolute left-4 w-5 h-5 text-muted-foreground" />
+                {/* Password Field */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Mật khẩu truy cập</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <input
-                      id="password"
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      className="w-full bg-background border-2 border-border rounded-xl px-12 py-3.5 text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary transition-colors font-medium"
-                      placeholder="••••••••••"
+                      placeholder="••••••••••••"
+                      className="w-full bg-white/50 border border-white/40 rounded-2xl px-12 py-4 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 text-muted-foreground hover:text-foreground transition-colors"
-                      aria-label={
-                        showPassword ? "Hide password" : "Show password"
-                      }
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary"
                     >
-                      {showPassword ? (
-                        <EyeOff className="w-5 h-5" />
-                      ) : (
-                        <Eye className="w-5 h-5" />
-                      )}
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
                 </div>
 
-                {/* Remember me & Forgot password */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between px-1">
                   <label className="flex items-center gap-2 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 rounded border-2 border-border bg-background text-primary focus:ring-primary focus:ring-offset-0"
-                    />
-                    <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors font-medium">
-                      Remember me
-                    </span>
+                    <input type="checkbox" className="w-4 h-4 rounded-lg border-white/60 bg-white/50 text-primary" />
+                    <span className="text-xs font-bold text-muted-foreground group-hover:text-foreground">Ghi nhớ tôi</span>
                   </label>
-                  <button
-                    type="button"
-                    className="text-sm text-primary hover:text-accent transition-colors font-semibold"
-                  >
-                    Forgot password?
-                  </button>
+                  {/* <button type="button" className="text-xs font-black text-primary hover:text-secondary transition-colors uppercase tracking-tighter">Quên mật khẩu?</button> */}
                 </div>
 
-                {/* Submit button */}
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="relative w-full group"
+                  className="w-full relative group/btn"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent rounded-xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity" />
-                  <div className="relative bg-gradient-to-r from-primary to-accent rounded-xl px-6 py-4 flex items-center justify-center gap-2 font-bold text-white shadow-lg">
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        <span>Signing in...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Sign in to E-DMS</span>
-                        <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                      </>
-                    )}
+                  <div className="absolute inset-0 cyber-gradient rounded-2xl blur-lg opacity-40 group-hover/btn:opacity-60 transition-opacity" />
+                  <div className="relative cyber-gradient rounded-2xl py-4 flex items-center justify-center gap-3 font-black text-white shadow-xl hover:shadow-neon transition-all">
+                    {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : <span>XÁC THỰC DANH TÍNH</span>}
                   </div>
                 </button>
               </form>
 
-              {/* Footer */}
-              <div className="mt-8 pt-6 border-t border-border text-center">
-                <p className="text-sm text-muted-foreground">
-                  Don't have an account?{" "}
-                  <button className="text-primary hover:text-accent transition-colors font-bold">
-                    Request access
-                  </button>
-                </p>
+              <div className="mt-8 pt-8 border-t border-white/20">
+                <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
+                  <p className="text-[10px] font-black text-primary uppercase tracking-wider mb-1 flex items-center gap-2">
+                    <History className="w-3 h-3" /> Tài khoản Test:
+                  </p>
+                  <ul className="text-[10px] text-muted-foreground font-bold space-y-0.5">
+                    <li>• <span className="text-foreground">first@edms.com</span> - Đăng nhập lần đầu</li>
+                    <li>• <span className="text-foreground">maintenance@edms.com</span> - Bảo trì</li>
+                    <li>• <span className="text-foreground">wrong@edms.com</span> - Sai thông tin</li>
+                  </ul>
+                </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
 
-      {/* Bottom decorative line */}
-      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+      {/* --- FIRST-TIME LOGIN MODAL --- */}
+      <AnimatePresence>
+        {showPasswordChange && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-xl"
+              onClick={() => setShowPasswordChange(false)}
+            />
+
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-md glass-panel rounded-[32px] p-10 border-white/60 shadow-[0_32px_128px_rgba(0,0,0,0.3)]"
+            >
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                  <KeyRound className="w-8 h-8 text-primary" />
+                </div>
+                <h3 className="text-2xl font-black tracking-tight mb-2">Cập nhật mật khẩu</h3>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Đây là lần đầu bạn đăng nhập. Vui lòng thiết lập mật khẩu mới để bảo vệ tài khoản.
+                </p>
+              </div>
+
+              <form onSubmit={handlePasswordChange} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Mật khẩu mới</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    placeholder="••••••••••••"
+                    className="w-full bg-white/50 border border-white/40 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Xác nhận mật khẩu</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    placeholder="••••••••••••"
+                    className="w-full bg-white/50 border border-white/40 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full cyber-gradient rounded-2xl py-4 flex items-center justify-center gap-3 font-black text-white shadow-xl hover:shadow-neon transition-all"
+                >
+                  {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : <span>LƯU MẬT KHẨU MỚI</span>}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 opacity-30">
+        <p className="text-[10px] font-black tracking-[0.5em] text-muted-foreground uppercase">Smart EDMS v2.0 &copy; 2024</p>
+      </div>
     </div>
   );
 }
