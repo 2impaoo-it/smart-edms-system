@@ -1,31 +1,67 @@
 import { createBrowserRouter, RouterProvider, Navigate } from "react-router";
 import { Login } from "./pages/Login";
-
-function Dashboard() {
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-background text-foreground">
-      <h1 className="text-3xl font-bold">Dashboard (Protected)</h1>
-    </div>
-  );
-}
-
+import { MainLayout } from "./components/layout/MainLayout";
+// Import các trang cần thiết
+import { FileExplorer } from "./pages/FileExplorer";
+import { PlaceholderPage } from "./pages/PlaceholderPage";
 const router = createBrowserRouter([
-  {
-    path: "/",
-    element: <Login />,
-  },
-  {
-    path: "/dashboard",
-    element: <Dashboard />,
-  },
-  {
-    path: "*",
-    element: <Navigate to="/" replace />,
-  }
+    {
+        path: "/",
+        element: <Login />,
+    },
+    {
+        path: "/dashboard",
+        element: <MainLayout />,
+        children: [
+            {
+                index: true,
+                element: <PlaceholderPage title="Dashboard Tổng quan" />,
+            },
+            {
+                path: "files",
+                element: <FileExplorer />, // Dành riêng spotlight cho task EDMS-50
+            },
+            {
+                path: "department",
+                element: <PlaceholderPage title="Quản lý Phòng ban" />,
+            },
+            {
+                path: "recycle-bin",
+                element: <PlaceholderPage title="Thùng rác" />,
+            },
+            {
+                path: "audit-logs",
+                element: <PlaceholderPage title="Nhật ký Hệ thống (Audit Logs)" />,
+            },
+            {
+                path: "approvals",
+                element: <PlaceholderPage title="Quản lý Phê duyệt" />,
+            },
+            {
+                path: "signatures",
+                element: <PlaceholderPage title="Quản lý Chữ ký" />,
+            },
+            {
+                path: "users",
+                element: <PlaceholderPage title="Quản lý Người dùng" />,
+            },
+            {
+                path: "storage",
+                element: <PlaceholderPage title="Quản lý Lưu trữ" />,
+            },
+            {
+                path: "settings",
+                element: <PlaceholderPage title="Cài đặt Hệ thống" />,
+            },
+        ]
+    },
+    {
+        path: "*",
+        element: <Navigate to="/" replace />,
+    }
 ]);
 
 function App() {
-  return <RouterProvider router={router} />;
+    return <RouterProvider router={router} />;
 }
-
 export default App;
