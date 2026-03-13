@@ -33,7 +33,7 @@ interface Notification {
 
 export function Login() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,29 +57,51 @@ export function Login() {
     e.preventDefault();
     setIsLoading(true);
 
-    // --- MOCK LOGIC FOR DEMONSTRATION ---
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: username, password: password })
+      });
 
-      if (email === "maintenance@edms.com") {
-        notify("Hệ thống hiện đang bảo trì định kỳ. Vui lòng quay lại sau 2h.", "warning");
-        return;
+      if (!response.ok) {
+        throw new Error('Sai tài khoản hoặc mật khẩu');
       }
 
-      if (email === "wrong@edms.com") {
-        notify("Tên đăng nhập hoặc mật khẩu không chính xác. Vui lòng thử lại.", "error");
-        return;
-      }
+      const data = await response.json();
+      const token = data.token;
 
-      if (email === "first@edms.com") {
-        setShowPasswordChange(true); // Trigger popup for first-time login
-        return;
-      }
+      // Decode JWT payload
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
 
-      // Default successful login
+      const payload = JSON.parse(jsonPayload);
+      const roles: string[] = payload.roles || [];
+      
+      let finalRole = 'STAFF';
+      if (roles.includes('ROLE_ADMIN')) finalRole = 'ADMIN';
+      else if (roles.includes('ROLE_MANAGER')) finalRole = 'MANAGER';
+
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify({
+        id: payload.sub,
+        name: payload.sub,
+        email: username, // Có thể là username hoặc email
+        role: finalRole,
+        department: "IT", // Mocked for now until backend provides it
+        status: "active"
+      }));
+
       notify("Đăng nhập thành công! Đang chuyển hướng...", "success");
       setTimeout(() => navigate("/dashboard"), 1000);
-    }, 1500);
+    } catch (error: any) {
+      notify(error.message || "Đăng nhập thất bại. Vui lòng thử lại.", "error");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handlePasswordChange = (e: React.FormEvent) => {
@@ -211,17 +233,17 @@ export function Login() {
               </div>
 
               <form onSubmit={handleLogin} className="space-y-6">
-                {/* Email Field */}
+                {/* Username/Email Field */}
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Email Tài Khoản</label>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Email / Tên đăng nhập</label>
                   <div className="relative">
                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
                       required
-                      placeholder="name@company.com"
+                      placeholder="Nhập email hoặc username"
                       className="w-full bg-white/50 border border-white/40 rounded-2xl px-12 py-4 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all"
                     />
                   </div>
