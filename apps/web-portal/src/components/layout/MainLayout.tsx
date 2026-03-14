@@ -32,36 +32,9 @@ export function MainLayout() {
     
     const currentFolderId = searchParams.get('folder');
 
-    // --- MOCK NOTIFICATIONS SYSTEM ---
+    // --- REAL NOTIFICATIONS SYSTEM (Now Empty by default) ---
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [toasts, setToasts] = useState<AppNotification[]>([]);
-
-    useEffect(() => {
-        // Spam mock data every 5 seconds to test
-        const interval = setInterval(() => {
-            const types: ('info' | 'warning' | 'error' | 'success')[] = ['info', 'warning', 'error', 'success'];
-            const randomType = types[Math.floor(Math.random() * types.length)];
-            
-            const newNotif: AppNotification = {
-                id: `notif_${Date.now()}`,
-                title: `Thông báo mới ${Math.floor(Math.random() * 100)}`,
-                message: "Hệ thống đang chạy tiến trình tự động. Vui lòng kiểm tra lại sau ít phút.",
-                type: randomType,
-                time: new Date().toLocaleTimeString(),
-                isRead: false
-            };
-
-            setNotifications(prev => [newNotif, ...prev].slice(0, 10)); // Keep last 10 in sidebar
-            setToasts(prev => [newNotif, ...prev]);
-
-            // Auto remove toast after 3 seconds
-            setTimeout(() => {
-                setToasts(prev => prev.filter(t => t.id !== newNotif.id));
-            }, 3000);
-        }, 5000); // spam every 5s
-
-        return () => clearInterval(interval);
-    }, []);
 
     // --- SECURITY: ADMIN CANNOT ACCESS PERSONAL FILES ---
     useEffect(() => {
