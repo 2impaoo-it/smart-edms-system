@@ -1,11 +1,21 @@
 import { useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
-import { Header } from "./Header";
 import type { UserRole } from "../../lib/types";
 import { FileExplorer } from "../../pages/FileExplorer";
 import { PlaceholderPage } from "../../pages/PlaceholderPage";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { cn } from "../../lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
+import { Info, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+
+export interface AppNotification {
+    id: string;
+    title: string;
+    message: string;
+    type: 'info' | 'warning' | 'error' | 'success';
+    time: string;
+    isRead: boolean;
+}
 
 export function MainLayout() {
     const navigate = useNavigate();
@@ -15,21 +25,43 @@ export function MainLayout() {
     // Initialize from localStorage
     const [currentUser, setCurrentUser] = useState<any>(() => {
         const stored = localStorage.getItem('user');
-        return stored ? JSON.parse(stored) : null;
+        return stored ? JSON.parse(stored) : { id: "1", role: "MANAGER", name: "Mock User", email: "mock@mock.com", department: "IT", avatar: "", status: "active" }; // Fallback for dev mode
     });
 
     const currentRole: UserRole = currentUser?.role || 'STAFF';
-
-    const [isSidebarHovered, setIsSidebarHovered] = useState(false);
-    const [isHeaderHovered, setIsHeaderHovered] = useState(false);
     
     const currentFolderId = searchParams.get('folder');
 
+    // --- MOCK NOTIFICATIONS SYSTEM ---
+    const [notifications, setNotifications] = useState<AppNotification[]>([]);
+    const [toasts, setToasts] = useState<AppNotification[]>([]);
+
     useEffect(() => {
-        if (!currentUser) {
-            navigate('/', { replace: true });
-        }
-    }, [currentUser, navigate]);
+        // Spam mock data every 5 seconds to test
+        const interval = setInterval(() => {
+            const types: ('info' | 'warning' | 'error' | 'success')[] = ['info', 'warning', 'error', 'success'];
+            const randomType = types[Math.floor(Math.random() * types.length)];
+            
+            const newNotif: AppNotification = {
+                id: `notif_${Date.now()}`,
+                title: `Thông báo mới ${Math.floor(Math.random() * 100)}`,
+                message: "Hệ thống đang chạy tiến trình tự động. Vui lòng kiểm tra lại sau ít phút.",
+                type: randomType,
+                time: new Date().toLocaleTimeString(),
+                isRead: false
+            };
+
+            setNotifications(prev => [newNotif, ...prev].slice(0, 10)); // Keep last 10 in sidebar
+            setToasts(prev => [newNotif, ...prev]);
+
+            // Auto remove toast after 3 seconds
+            setTimeout(() => {
+                setToasts(prev => prev.filter(t => t.id !== newNotif.id));
+            }, 3000);
+        }, 5000); // spam every 5s
+
+        return () => clearInterval(interval);
+    }, []);
 
     // --- SECURITY: ADMIN CANNOT ACCESS PERSONAL FILES ---
     useEffect(() => {
@@ -76,45 +108,50 @@ export function MainLayout() {
     };
 
     return (
-        <div className="flex h-screen overflow-hidden selection:bg-primary/20 selection:text-primary transition-colors duration-300 bg-slate-50 dark:bg-slate-950">
+        <div className="flex h-screen overflow-hidden selection:bg-primary/20 selection:text-primary transition-colors duration-300 bg-slate-50 dark:bg-slate-950 relative">
             
-            {/* --- TRIGGER ZONES --- */}
-            <div 
-                className="fixed top-0 left-0 bottom-0 w-2 z-[60]" 
-                onMouseEnter={() => setIsSidebarHovered(true)}
-            />
-            <div 
-                className="fixed top-0 left-0 right-0 h-2 z-[60]" 
-                onMouseEnter={() => setIsHeaderHovered(true)}
-            />
+            {/* Sidebar is now always visible */}
+            <Sidebar role={currentRole} user={currentUser} notifications={notifications} />
 
-            {/* Sidebar with hover control */}
-            <div onMouseLeave={() => setIsSidebarHovered(false)} className="h-full">
-                <Sidebar role={currentRole} isHovered={isSidebarHovered} />
-            </div>
-
-            {/* Main Content with dynamic push */}
-            <div 
-                className="flex-1 flex flex-col min-w-0 overflow-hidden relative transition-all duration-500 ease-[0.23,1,0.32,1]"
-                style={{ 
-                    marginLeft: isSidebarHovered ? 'var(--sidebar-width)' : '0px',
-                    paddingTop: isHeaderHovered ? 'var(--header-height)' : '0px'
-                }}
-            >
-                <div onMouseLeave={() => setIsHeaderHovered(false)}>
-                    <Header 
-                        user={currentUser} 
-                        currentFolderId={currentFolderId}
-                        onBreadcrumbClick={handleFolderChange}
-                        isVisible={isHeaderHovered}
-                    />
-                </div>
-
-                <main className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth relative z-10">
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+                <main className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth relative z-10 pt-8">
                     <div className="max-w-[1600px] mx-auto animate-in fade-in duration-1000">
                         {renderContent()}
                     </div>
                 </main>
+            </div>
+
+            {/* --- TOAST NOTIFICATIONS (TOP RIGHT) --- */}
+            <div className="fixed top-6 right-6 z-[999] flex flex-col gap-3 pointer-events-none">
+                <AnimatePresence>
+                    {toasts.map(toast => (
+                        <motion.div
+                            key={toast.id}
+                            initial={{ opacity: 0, x: 50, scale: 0.9 }}
+                            animate={{ opacity: 1, x: 0, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9, y: -20 }}
+                            className="glass-panel bg-white/95 backdrop-blur-md border border-white/60 shadow-2xl rounded-2xl p-4 w-80 pointer-events-auto flex gap-3 items-start"
+                        >
+                            <div className={cn(
+                                "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
+                                toast.type === 'info' ? "bg-blue-100 text-blue-600" :
+                                toast.type === 'warning' ? "bg-amber-100 text-amber-600" :
+                                toast.type === 'error' ? "bg-red-100 text-red-600" :
+                                "bg-green-100 text-green-600"
+                            )}>
+                                {toast.type === 'warning' ? <AlertTriangle className="w-4 h-4" /> :
+                                 toast.type === 'error' ? <XCircle className="w-4 h-4" /> :
+                                 toast.type === 'info' ? <Info className="w-4 h-4" /> :
+                                 <CheckCircle className="w-4 h-4" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <h4 className="text-sm font-bold text-slate-800">{toast.title}</h4>
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed">{toast.message}</p>
+                            </div>
+                        </motion.div>
+                    ))}
+                </AnimatePresence>
             </div>
 
             {/* Cyber Background */}
