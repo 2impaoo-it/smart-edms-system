@@ -16,7 +16,9 @@ import {
     PenTool,
     Download,
     
-    Folder
+    Folder,
+    ChevronRight,
+    Home
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { FileItem, User } from "../lib/types";
@@ -222,18 +224,23 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
 
     const fileToView = files.find(f => f.id === viewFileId);
 
-    // Build breadcrumbs
-    const breadcrumbs = [];
-    let curr = currentFolderId;
-    while (curr && curr !== 'root' && curr !== 'dept_root') {
-        const f = files.find(x => x.id === curr);
-        if (f) {
-            breadcrumbs.unshift({ id: f.id, name: f.name });
-            curr = f.parentId;
-        } else {
-            break;
+    // Build breadcrumbs optimally with useMemo to prevent unnecessary recalculations
+    const breadcrumbs = useMemo(() => {
+        const crumbs = [];
+        let curr = currentFolderId;
+        const visited = new Set<string>(); // Prevent infinite loops in case of malformed data
+        while (curr && curr !== 'root' && curr !== 'dept_root' && !visited.has(curr)) {
+            visited.add(curr);
+            const f = files.find(x => x.id === curr);
+            if (f) {
+                crumbs.unshift({ id: f.id, name: f.name });
+                curr = f.parentId;
+            } else {
+                break;
+            }
         }
-    }
+        return crumbs;
+    }, [currentFolderId, files]);
 
     return (
         <div 
@@ -262,18 +269,46 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
 
             {/* Header Area */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-                <div>
+                <div className="space-y-4 w-full lg:w-auto">
                     <h2 className="text-3xl font-black tracking-tight uppercase italic gradient-text">{title}</h2>
                     
-                    {/* Breadcrumbs */}
-                    <div className="flex items-center gap-2 mt-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-                        <button onClick={() => onFolderChange(null)} className="hover:text-primary transition-colors">{title}</button>
-                        {breadcrumbs.map(b => (
-                            <div key={b.id} className="flex items-center gap-2">
-                                <span>/</span>
-                                <button onClick={() => onFolderChange(b.id)} className="hover:text-primary transition-colors">{b.name}</button>
-                            </div>
-                        ))}
+                    {/* Modern Breadcrumbs */}
+                    <div className="inline-flex items-center gap-1 px-3 py-2 glass-panel rounded-2xl bg-white/40 dark:bg-slate-900/40 shadow-sm border border-white/60 backdrop-blur-md overflow-x-auto max-w-full no-scrollbar">
+                        <button 
+                            onClick={() => onFolderChange(null)} 
+                            className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-primary hover:bg-white/60 dark:hover:bg-slate-800/60 px-3 py-1.5 rounded-xl transition-all duration-300"
+                        >
+                            <Home className="w-4 h-4" />
+                            <span className="max-w-[120px] truncate">{title}</span>
+                        </button>
+                        
+                        <AnimatePresence>
+                            {breadcrumbs.map((b, index) => {
+                                const isLast = index === breadcrumbs.length - 1;
+                                return (
+                                    <motion.div 
+                                        key={b.id} 
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        className="flex items-center gap-1"
+                                    >
+                                        <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 flex-shrink-0" />
+                                        <button 
+                                            onClick={() => onFolderChange(b.id)} 
+                                            disabled={isLast}
+                                            className={cn(
+                                                "text-xs font-bold px-3 py-1.5 rounded-xl transition-all duration-300 truncate max-w-[150px]",
+                                                isLast 
+                                                    ? "text-primary bg-primary/10 cursor-default" 
+                                                    : "text-slate-500 hover:text-primary hover:bg-white/60 dark:hover:bg-slate-800/60 cursor-pointer"
+                                            )}
+                                        >
+                                            {b.name}
+                                        </button>
+                                    </motion.div>
+                                );
+                            })}
+                        </AnimatePresence>
                     </div>
                 </div>
 

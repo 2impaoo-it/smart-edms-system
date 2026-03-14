@@ -8,16 +8,28 @@ import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { cn } from "../../lib/utils";
 
 export function MainLayout() {
-    const [currentRole, setCurrentRole] = useState<UserRole>('MANAGER');
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    // Initialize from localStorage
+    const [currentUser, setCurrentUser] = useState<any>(() => {
+        const stored = localStorage.getItem('user');
+        return stored ? JSON.parse(stored) : null;
+    });
+
+    const currentRole: UserRole = currentUser?.role || 'STAFF';
+
     const [isSidebarHovered, setIsSidebarHovered] = useState(false);
     const [isHeaderHovered, setIsHeaderHovered] = useState(false);
     
-    const location = useLocation();
-    const navigate = useNavigate();
-    const [searchParams, setSearchParams] = useSearchParams();
-    
     const currentFolderId = searchParams.get('folder');
-    const currentUser: any = ([] as any[]).find(u => u.role === currentRole) || ({ id: "1", role: "MANAGER", name: "Mock User", email: "mock@mock.com", department: "IT", avatar: "", status: "active" } as any);
+
+    useEffect(() => {
+        if (!currentUser) {
+            navigate('/', { replace: true });
+        }
+    }, [currentUser, navigate]);
 
     // --- SECURITY: ADMIN CANNOT ACCESS PERSONAL FILES ---
     useEffect(() => {
