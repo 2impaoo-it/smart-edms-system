@@ -13,6 +13,12 @@ export const getFolderContents = (parentId: string | null) =>
   axiosClient.get("/categories", { params: { parentId } });
 
 /**
+ * Lấy toàn bộ cây thư mục để render Breadcrumb
+ */
+export const getFolderTree = () =>
+  axiosClient.get("/categories/tree");
+
+/**
  * Tạo thư mục mới.
  */
 export const createFolder = (payload: FolderCreatePayload) =>

@@ -24,7 +24,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import type { FileItem, User } from "../lib/types";
 import { cn } from "../lib/utils";
-import { getFolderContents, createFolder } from "../services/folderService";
+import { getFolderContents, createFolder, deleteFolder, getFolderTree } from "../services/folderService";
 
 interface FileExplorerProps {
     title: string;
@@ -90,6 +90,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
     const [contextMenu, setContextMenu] = useState<{ id: string, x: number, y: number } | null>(null);
     const [viewFileId, setViewFileId] = useState<string | null>(null);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+    const [breadcrumbs, setBreadcrumbs] = useState<{id: string, name: string}[]>([]);
 
     // Fetch data from API
     const fetchFilesAndFolders = async () => {
@@ -131,29 +132,51 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
         return () => window.removeEventListener('click', handleClickOutside);
     }, []);
 
-    // Fetch data when folder changes
+    // Fetch data and build breadcrumbs when folder changes
     useEffect(() => {
         fetchFilesAndFolders();
+
+        // Build Breadcrumbs from backend tree
+        const buildBreadcrumbs = async () => {
+            if (!currentFolderId || currentFolderId === 'root' || currentFolderId === 'dept_root') {
+                setBreadcrumbs([]);
+                return;
+            }
+            try {
+                const res = await getFolderTree();
+                const tree = Array.isArray(res.data) ? res.data : [];
+                const path: {id: string, name: string}[] = [];
+                
+                const findPath = (nodes: any[], targetId: string, currentPath: any[]): boolean => {
+                    for (const node of nodes) {
+                        const newPath = [...currentPath, { id: String(node.id), name: node.name }];
+                        if (String(node.id) === targetId) {
+                            path.push(...newPath);
+                            return true;
+                        }
+                        if (node.children && node.children.length > 0) {
+                            if (findPath(node.children, targetId, newPath)) return true;
+                        }
+                    }
+                    return false;
+                };
+
+                findPath(tree, currentFolderId, []);
+                setBreadcrumbs(path);
+            } catch (err) {
+                console.error("Failed to get breadcrumbs", err);
+            }
+        };
+
+        buildBreadcrumbs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentFolderId, ownerId, title]);
 
     const currentFiles = useMemo(() => {
         const filtered = files.filter(f => {
             if (f.isDeleted) return false;
-            const matchesParent = f.parentId === currentFolderId;
-            
-            // If viewing personal files
-            if (ownerId) return matchesParent && f.owner === ownerId;
-            
-            // If viewing department files and user is Manager
-            if (user && user.role === 'MANAGER' && title === "Kho phòng ban") {
-                // A manager can only see folders/files that belong to users in their department
-                const fileOwner = ([] as any[]).find(u => u.id === f.owner);
-                if (fileOwner && fileOwner.department !== user.department) {
-                    return false; // Filter out if owner is not in the same department
-                }
-            }
-            
-            return matchesParent;
+            // API now already returns correct filtered data by parentId
+            return true;
         });
 
         // Sort: Folders first, then files
@@ -162,7 +185,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
             if (a.type !== 'folder' && b.type === 'folder') return 1;
             return 0;
         });
-    }, [currentFolderId, ownerId, user, title, files]);
+    }, [files]);
 
     const handleFileClick = (e: React.MouseEvent, file: FileItem) => {
         e.preventDefault();
@@ -202,7 +225,8 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
         if (!newFolderName.trim()) return;
         
         try {
-            await createFolder({ name: newFolderName, parentId: currentFolderId });
+            const apiParentId = (currentFolderId === 'root' || currentFolderId === 'dept_root') ? null : currentFolderId;
+            await createFolder({ name: newFolderName, parentId: apiParentId });
             toast.success(`Đã tạo thư mục: ${newFolderName}`);
             
             // Re-fetch folders to get the real ID from DB
@@ -235,6 +259,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
         );
         
         uploadTask.then(() => {
+            toast.info("Dữ liệu file tải lên hiện chỉ là Mock UI. Nó sẽ biến mất khi tải lại trang do API chưa hỗ trợ.");
             const fileExt = uploadedFileName.split('.').pop()?.toLowerCase();
             let validExt: 'pdf' | 'docx' | 'xlsx' | 'image' = 'pdf';
             if (fileExt === 'docx') validExt = 'docx';
@@ -255,18 +280,24 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
         });
     };
 
-    const handleDelete = (id: string) => {
-        setFiles(files.map(f => {
-            if (f.id === id) {
-                toast(`Đã chuyển "${f.name}" vào thùng rác`, { icon: '🗑️' });
-                // If it was pending or signed, we might want to log it or notify
-                // But for now, we just mark it as deleted
-                return { ...f, isDeleted: true, deletedAt: new Date().toISOString() };
+    const handleDelete = async (id: string) => {
+        const fileToDelete = files.find(f => f.id === id);
+        
+        try {
+            if (fileToDelete?.type === 'folder') {
+                await deleteFolder(id);
+                toast.success(`Đã chuyển thư mục "${fileToDelete.name}" vào thùng rác`, { icon: '🗑️' });
+                fetchFilesAndFolders();
+            } else {
+                // Mock delete for files since no document API yet
+                toast(`Đã chuyển file "${fileToDelete?.name}" vào thùng rác`, { icon: '🗑️' });
+                setFiles(files.filter(f => f.id !== id));
             }
-            return f;
-        }));
+        } catch (error: any) {
+            toast.error("Lỗi khi xóa: " + (error?.response?.data?.message || "Hệ thống bận"));
+        }
+        
         setContextMenu(null);
-        // Dispatch custom event for notifications if needed, or simply let the app know (mocking)
     };
 
     const handleRecall = (id: string) => {
@@ -288,24 +319,6 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
     };
 
     const fileToView = files.find(f => f.id === viewFileId);
-
-    // Build breadcrumbs optimally with useMemo to prevent unnecessary recalculations
-    const breadcrumbs = useMemo(() => {
-        const crumbs = [];
-        let curr = currentFolderId;
-        const visited = new Set<string>(); // Prevent infinite loops in case of malformed data
-        while (curr && curr !== 'root' && curr !== 'dept_root' && !visited.has(curr)) {
-            visited.add(curr);
-            const f = files.find(x => x.id === curr);
-            if (f) {
-                crumbs.unshift({ id: f.id, name: f.name });
-                curr = f.parentId;
-            } else {
-                break;
-            }
-        }
-        return crumbs;
-    }, [currentFolderId, files]);
 
     return (
         <div 
