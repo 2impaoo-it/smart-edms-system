@@ -44,12 +44,13 @@ public class SecurityConfig {
                                                                                                               // dùng
                                                                                                               // session
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS).permitAll() // allow CORS preflight
                         .requestMatchers("/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/users").hasRole("ADMIN")
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs.yaml")
                         .permitAll() // Swagger UI
-                        .anyRequest().authenticated() // Còn lại bắt buộc phải đăng nhập
+                        .anyRequest().authenticated() // CÃ²n láº¡i báº¯t buá»™c pháº£i Ä‘Äƒng nháº­p     
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
