@@ -1,4 +1,9 @@
 import { Link, useLocation } from "react-router";
+import { cn } from "../../lib/utils";
+import type { UserRole } from "../../lib/types";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { gooeyToast as toast } from "goey-toast";
 import {
     LayoutDashboard,
     PenTool,
@@ -15,14 +20,11 @@ import {
     Moon,
     Sun,
     User,
+    CheckCircle2,
+    AlertCircle,
     Info,
-    AlertTriangle,
-    CheckCircle
+    Check
 } from "lucide-react";
-import { cn } from "../../lib/utils";
-import type { UserRole } from "../../lib/types";
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 
 interface SidebarProps {
     role: UserRole;
@@ -151,9 +153,54 @@ export function Sidebar({ role, user, notifications }: SidebarProps) {
                                             <h3 className="font-black text-xs uppercase tracking-widest text-slate-800 dark:text-slate-100">Thông báo</h3>
                                             <span className="text-[9px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full">{unreadCount} mới</span>
                                         </div>
-                                        <div className="max-h-[400px] overflow-y-auto scrollbar-hide p-6 text-center text-muted-foreground relative z-20">
-                                            <Bell className="w-8 h-8 mx-auto opacity-20 mb-3" />
-                                            <p className="text-xs font-bold dark:text-slate-400">Không có thông báo mới</p>
+                                        <div className="max-h-[400px] overflow-y-auto scrollbar-hide p-2 relative z-20">
+                                            {notifications.length === 0 ? (
+                                                <div className="text-center text-muted-foreground p-6">
+                                                    <Bell className="w-8 h-8 mx-auto opacity-20 mb-3" />
+                                                    <p className="text-xs font-bold dark:text-slate-400">Không có thông báo mới</p>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-1">
+                                                    {notifications.map(n => (
+                                                        <div key={n.id} className={cn(
+                                                            "p-3 rounded-2xl transition-colors hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer flex gap-3",
+                                                            !n.isRead ? "bg-slate-50 dark:bg-white/5" : "opacity-70"
+                                                        )}>
+                                                            <div className={cn(
+                                                                "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                                                                n.type === 'info' ? "bg-blue-100 text-blue-600" :
+                                                                n.type === 'warning' ? "bg-amber-100 text-amber-600" :
+                                                                n.type === 'error' ? "bg-red-100 text-red-600" :
+                                                                "bg-green-100 text-green-600"
+                                                            )}>
+                                                                {n.type === 'info' && <Info className="w-4 h-4" />}
+                                                                {n.type === 'warning' && <AlertCircle className="w-4 h-4" />}
+                                                                {n.type === 'error' && <ShieldAlert className="w-4 h-4" />}
+                                                                {n.type === 'success' && <CheckCircle2 className="w-4 h-4" />}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex justify-between items-start mb-0.5">
+                                                                    <h4 className={cn("text-sm truncate", !n.isRead ? "font-bold text-slate-800 dark:text-slate-200" : "font-semibold text-slate-600 dark:text-slate-400")}>{n.title}</h4>
+                                                                    {!n.isRead && <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1.5 ml-2"></span>}
+                                                                </div>
+                                                                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{n.message}</p>
+                                                                <p className="text-[10px] font-bold text-muted-foreground/60 uppercase mt-1">{n.time}</p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    <div className="p-2 border-t border-slate-100 dark:border-slate-800 mt-2">
+                                                        <button 
+                                                            onClick={() => {
+                                                                setShowNotifications(false);
+                                                                toast.success("Đã đánh dấu đọc tất cả");
+                                                            }}
+                                                            className="w-full py-2.5 rounded-xl text-xs font-bold text-primary bg-primary/10 hover:bg-primary hover:text-white transition-colors flex items-center justify-center gap-2"
+                                                        >
+                                                            <Check className="w-4 h-4" /> Đánh dấu đã đọc
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </motion.div>
                                 )}

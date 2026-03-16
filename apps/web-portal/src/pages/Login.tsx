@@ -2,34 +2,20 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
+import { gooeyToast as toast } from "goey-toast";
 import {
   Mail,
   Lock,
   Eye,
   EyeOff,
-  
   Loader2,
   Cpu,
   Shield,
   Zap,
   Fingerprint,
-  AlertCircle,
-  X,
-  CheckCircle2,
-  ShieldAlert,
   KeyRound,
   History
 } from "lucide-react";
-import { cn } from "../lib/utils";
-
-// --- Types ---
-type NotificationType = 'error' | 'success' | 'warning' | 'info';
-
-interface Notification {
-  id: string;
-  message: string;
-  type: NotificationType;
-}
 
 export function Login() {
   const navigate = useNavigate();
@@ -38,26 +24,19 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // States for Notifications & Modals
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  // States for Modals
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
-  // Helper to add notification
-  const notify = (message: string, type: NotificationType = 'error') => {
-    const id = Math.random().toString(36).substring(7);
-    setNotifications(prev => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    }, 5000);
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    try {
+    const loginPromise = async () => {
+      // Giả lập delay mạng để thấy rõ hiệu ứng morphing
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -69,54 +48,74 @@ export function Login() {
       }
 
       const data = await response.json();
-      const token = data.token;
+      return data.token;
+    };
 
-      // Decode JWT payload
-      const base64Url = token.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-      }).join(''));
+    const promiseInstance = loginPromise();
 
-      const payload = JSON.parse(jsonPayload);
-      const roles: string[] = payload.roles || [];
-      
-      let finalRole = 'STAFF';
-      if (roles.includes('ROLE_ADMIN')) finalRole = 'ADMIN';
-      else if (roles.includes('ROLE_MANAGER')) finalRole = 'MANAGER';
+    toast.promise(promiseInstance, {
+      loading: "Đang xác thực thông tin...",
+      success: (token) => {
+        try {
+          // Decode JWT payload
+          const base64Url = token.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+              return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          }).join(''));
 
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify({
-        id: payload.sub,
-        name: payload.sub,
-        email: username, // Có thể là username hoặc email
-        role: finalRole,
-        department: "IT", // Mocked for now until backend provides it
-        status: "active"
-      }));
+          const payload = JSON.parse(jsonPayload);
+          const roles: string[] = payload.roles || [];
+          
+          let finalRole = 'STAFF';
+          if (roles.includes('ROLE_ADMIN')) finalRole = 'ADMIN';
+          else if (roles.includes('ROLE_MANAGER')) finalRole = 'MANAGER';
 
-      notify("Đăng nhập thành công! Đang chuyển hướng...", "success");
-      setTimeout(() => navigate("/dashboard"), 1000);
-    } catch (error: any) {
-      notify(error.message || "Đăng nhập thất bại. Vui lòng thử lại.", "error");
-    } finally {
-      setIsLoading(false);
-    }
+          localStorage.setItem('token', token);
+          localStorage.setItem('user', JSON.stringify({
+            id: payload.sub,
+            name: payload.sub,
+            email: username,
+            role: finalRole,
+            department: "IT",
+            status: "active"
+          }));
+        } catch(e) {
+          console.error(e);
+        }
+
+        setTimeout(() => navigate("/dashboard"), 800);
+        return "Đăng nhập thành công! Đang chuyển hướng...";
+      },
+      error: (err: any) => err.message || "Đăng nhập thất bại. Vui lòng thử lại."
+    });
+    
+    promiseInstance.finally(() => {
+        setIsLoading(false);
+    });
   };
 
   const handlePasswordChange = (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      notify("Mật khẩu xác nhận không khớp.", "error");
+      toast.error("Mật khẩu xác nhận không khớp.");
       return;
     }
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setShowPasswordChange(false);
-      notify("Đổi mật khẩu thành công. Chào mừng bạn!", "success");
-      setTimeout(() => navigate("/dashboard"), 1000);
-    }, 1500);
+    
+    const changePassPromise = new Promise(resolve => setTimeout(resolve, 1500));
+    
+    toast.promise(changePassPromise, {
+        loading: "Đang cập nhật mật khẩu...",
+        success: "Đổi mật khẩu thành công. Chào mừng bạn!",
+        error: "Lỗi khi đổi mật khẩu"
+    });
+    
+    changePassPromise.finally(() => {
+        setIsLoading(false);
+        setShowPasswordChange(false);
+        setTimeout(() => navigate("/dashboard"), 1000);
+    });
   };
 
   return (
@@ -126,41 +125,6 @@ export function Login() {
         <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-primary/10 blur-[120px] animate-pulse" />
         <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-secondary/10 blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
         <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(99,102,241,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(99,102,241,0.03)_1px,transparent_1px)] bg-[size:3rem_3rem]" />
-      </div>
-
-      {/* --- Notification Toast System --- */}
-      <div className="fixed top-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none">
-        <AnimatePresence>
-          {notifications.map((n) => (
-            <motion.div
-              key={n.id}
-              initial={{ opacity: 0, x: 50, scale: 0.9 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: 20, scale: 0.95 }}
-              className={cn(
-                "pointer-events-auto flex items-center gap-3 px-5 py-4 rounded-2xl glass-panel shadow-2xl border-white/60 min-w-[320px]",
-                n.type === 'error' && "border-l-4 border-l-destructive",
-                n.type === 'success' && "border-l-4 border-l-success",
-                n.type === 'warning' && "border-l-4 border-l-warning",
-                n.type === 'info' && "border-l-4 border-l-primary"
-              )}
-            >
-              {n.type === 'error' && <ShieldAlert className="w-5 h-5 text-destructive" />}
-              {n.type === 'success' && <CheckCircle2 className="w-5 h-5 text-success" />}
-              {n.type === 'warning' && <AlertCircle className="w-5 h-5 text-warning" />}
-              {n.type === 'info' && <AlertCircle className="w-5 h-5 text-primary" />}
-
-              <div className="flex-1">
-                <p className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-0.5">Thông báo hệ thống</p>
-                <p className="text-sm font-bold text-foreground/90">{n.message}</p>
-              </div>
-
-              <button onClick={() => setNotifications(prev => prev.filter(item => item.id !== n.id))} className="p-1 hover:bg-black/5 rounded-lg transition-colors">
-                <X className="w-4 h-4 text-muted-foreground" />
-              </button>
-            </motion.div>
-          ))}
-        </AnimatePresence>
       </div>
 
       <div className="relative z-10 min-h-screen flex items-center justify-center p-6">

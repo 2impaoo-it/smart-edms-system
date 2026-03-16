@@ -4,9 +4,6 @@ import type { UserRole } from "../../lib/types";
 import { FileExplorer } from "../../pages/FileExplorer";
 import { PlaceholderPage } from "../../pages/PlaceholderPage";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
-import { cn } from "../../lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
-import { Info, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
 
 export interface AppNotification {
     id: string;
@@ -23,7 +20,7 @@ export function MainLayout() {
     const [searchParams, setSearchParams] = useSearchParams();
 
     // Initialize from localStorage
-    const [currentUser, setCurrentUser] = useState<any>(() => {
+    const [currentUser] = useState<any>(() => {
         const stored = localStorage.getItem('user');
         return stored ? JSON.parse(stored) : { id: "1", role: "MANAGER", name: "Mock User", email: "mock@mock.com", department: "IT", avatar: "", status: "active" }; // Fallback for dev mode
     });
@@ -32,9 +29,12 @@ export function MainLayout() {
     
     const currentFolderId = searchParams.get('folder');
 
-    // --- REAL NOTIFICATIONS SYSTEM (Now Empty by default) ---
-    const [notifications, setNotifications] = useState<AppNotification[]>([]);
-    const [toasts, setToasts] = useState<AppNotification[]>([]);
+    // --- REAL NOTIFICATIONS SYSTEM ---
+    const [notifications] = useState<AppNotification[]>([
+        { id: '1', title: 'Tài liệu mới', message: 'Tài liệu "Quy_Trinh_Bao_Mat_2024.pdf" vừa được tải lên kho phòng ban.', type: 'info', time: 'Vừa xong', isRead: false },
+        { id: '2', title: 'Cần phê duyệt', message: 'Bạn có 3 hợp đồng đang chờ chữ ký số.', type: 'warning', time: '1 giờ trước', isRead: false },
+        { id: '3', title: 'Thành công', message: 'Tiến trình sao lưu dữ liệu hệ thống đã hoàn tất.', type: 'success', time: '2 giờ trước', isRead: true },
+    ]);
 
     // --- SECURITY: ADMIN CANNOT ACCESS PERSONAL FILES ---
     useEffect(() => {
@@ -93,38 +93,6 @@ export function MainLayout() {
                         {renderContent()}
                     </div>
                 </main>
-            </div>
-
-            {/* --- TOAST NOTIFICATIONS (TOP RIGHT) --- */}
-            <div className="fixed top-6 right-6 z-[999] flex flex-col gap-3 pointer-events-none">
-                <AnimatePresence>
-                    {toasts.map(toast => (
-                        <motion.div
-                            key={toast.id}
-                            initial={{ opacity: 0, x: 50, scale: 0.9 }}
-                            animate={{ opacity: 1, x: 0, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.9, y: -20 }}
-                            className="glass-panel bg-white/95 backdrop-blur-md border border-white/60 shadow-2xl rounded-2xl p-4 w-80 pointer-events-auto flex gap-3 items-start"
-                        >
-                            <div className={cn(
-                                "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
-                                toast.type === 'info' ? "bg-blue-100 text-blue-600" :
-                                toast.type === 'warning' ? "bg-amber-100 text-amber-600" :
-                                toast.type === 'error' ? "bg-red-100 text-red-600" :
-                                "bg-green-100 text-green-600"
-                            )}>
-                                {toast.type === 'warning' ? <AlertTriangle className="w-4 h-4" /> :
-                                 toast.type === 'error' ? <XCircle className="w-4 h-4" /> :
-                                 toast.type === 'info' ? <Info className="w-4 h-4" /> :
-                                 <CheckCircle className="w-4 h-4" />}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h4 className="text-sm font-bold text-slate-800">{toast.title}</h4>
-                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed">{toast.message}</p>
-                            </div>
-                        </motion.div>
-                    ))}
-                </AnimatePresence>
             </div>
 
             {/* Cyber Background */}

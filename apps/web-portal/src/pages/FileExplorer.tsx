@@ -1,5 +1,6 @@
 
 import { useState, useEffect, useMemo } from "react";
+import { gooeyToast as toast } from "goey-toast";
 import { 
     FolderPlus, 
     FileUp, 
@@ -169,6 +170,9 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
     const handleCreateFolder = (e: React.FormEvent) => {
         e.preventDefault();
         if (!newFolderName.trim()) return;
+        
+        toast.success(`Đã tạo thư mục: ${newFolderName}`);
+
         const newFolder: FileItem = {
             id: `folder_${Date.now()}`,
             name: newFolderName,
@@ -189,29 +193,45 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
         if (e && e.target.files && e.target.files.length > 0) {
             uploadedFileName = e.target.files[0].name;
         }
-        const fileExt = uploadedFileName.split('.').pop()?.toLowerCase();
-        let validExt: 'pdf' | 'docx' | 'xlsx' | 'image' = 'pdf';
-        if (fileExt === 'docx') validExt = 'docx';
-        else if (fileExt === 'xlsx') validExt = 'xlsx';
-        else if (['png', 'jpg', 'jpeg'].includes(fileExt || '')) validExt = 'image';
-
-        const newDoc: FileItem = {
-            id: `doc_${Date.now()}`,
-            name: uploadedFileName,
-            type: validExt,
-            size: '2.5 MB',
-            updatedAt: new Date().toLocaleDateString(),
-            owner: ownerId || user?.id || 'sys',
-            status: 'draft',
-            parentId: currentFolderId
-        };
-        setFiles([newDoc, ...files]);
+        
         setIsUploadModalOpen(false);
+
+        const uploadTask = new Promise((resolve) => setTimeout(resolve, 1500));
+
+        toast.promise(
+            uploadTask, 
+            {
+                loading: `Đang tải lên: ${uploadedFileName}...`,
+                success: `Tải lên thành công!`,
+                error: 'Tải lên thất bại'
+            }
+        );
+        
+        uploadTask.then(() => {
+            const fileExt = uploadedFileName.split('.').pop()?.toLowerCase();
+            let validExt: 'pdf' | 'docx' | 'xlsx' | 'image' = 'pdf';
+            if (fileExt === 'docx') validExt = 'docx';
+            else if (fileExt === 'xlsx') validExt = 'xlsx';
+            else if (['png', 'jpg', 'jpeg'].includes(fileExt || '')) validExt = 'image';
+
+            const newDoc: FileItem = {
+                id: `doc_${Date.now()}`,
+                name: uploadedFileName,
+                type: validExt,
+                size: '2.5 MB',
+                updatedAt: new Date().toLocaleDateString(),
+                owner: ownerId || user?.id || 'sys',
+                status: 'draft',
+                parentId: currentFolderId
+            };
+            setFiles(prev => [newDoc, ...prev]);
+        });
     };
 
     const handleDelete = (id: string) => {
         setFiles(files.map(f => {
             if (f.id === id) {
+                toast(`Đã chuyển "${f.name}" vào thùng rác`, { icon: '🗑️' });
                 // If it was pending or signed, we might want to log it or notify
                 // But for now, we just mark it as deleted
                 return { ...f, isDeleted: true, deletedAt: new Date().toISOString() };
@@ -225,6 +245,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
     const handleRecall = (id: string) => {
         setFiles(files.map(f => {
             if (f.id === id) {
+                toast.success(`Đã thu hồi tài liệu "${f.name}"`);
                 return { ...f, status: 'draft' };
             }
             return f;
