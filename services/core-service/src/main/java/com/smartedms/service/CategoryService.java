@@ -54,7 +54,7 @@ public class CategoryService {
 
     @Transactional
     public void softDelete(Long id) {
-        Category category = folderRepository.findById(id)
+        Category category = folderRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found: " + id));
         softDeleteRecursive(category);
     }
@@ -65,14 +65,14 @@ public class CategoryService {
         folderRepository.save(category);
 
         // Đánh dấu xóa tất cả document bên trong
-        List<Document> documents = documentRepository.findByFolderId(category.getId());
+        List<Document> documents = documentRepository.findByFolderIdAndIsDeletedFalse(category.getId());
         for (Document doc : documents) {
             doc.setDeleted(true);
             documentRepository.save(doc);
         }
 
         // Đệ quy xóa tất cả thư mục con
-        List<Category> children = folderRepository.findByParentId(category.getId());
+        List<Category> children = folderRepository.findByParentIdAndIsDeletedFalse(category.getId());
         for (Category child : children) {
             softDeleteRecursive(child);
         }
