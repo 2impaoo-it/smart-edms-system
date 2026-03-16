@@ -1,5 +1,6 @@
 package com.smartedms.filter;
 
+import com.smartedms.repository.UserRepository;
 import com.smartedms.utils.JwtUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -52,11 +54,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // 4. Tạo UserDetails trực tiếp từ token claims (không cần query DB)
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            com.smartedms.entity.User currentUser = userRepository.findByUsername(username).orElse(null);
+            if (currentUser == null) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            String path = request.getServletPath();
+            boolean isAllowedPathWhenForceChange = "/api/auth/change-password-first-time".equals(path)
+                    || "/api/auth/login".equals(path)
+                    || path.startsWith("/swagger-ui")
+                    || path.startsWith("/v3/api-docs");
+            if (currentUser.isMustChangePassword() && !isAllowedPathWhenForceChange) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"message\":\"Bạn phải đổi mật khẩu ở lần đăng nhập đầu tiên\"}");
+                return;
+            }
+
             List<SimpleGrantedAuthority> authorities = roles.stream()
                     .map(SimpleGrantedAuthority::new)
                     .collect(Collectors.toList());
 
-            // Sử dụng password placeholder an toàn vì authentication dựa trên token đã validated
+            // Sử dụng password placeholder an toàn vì authentication dựa trên token đã
+            // validated
             UserDetails userDetails = User.withUsername(username)
                     .password("{noop}") // Password không được sử dụng cho authentication từ token
                     .authorities(authorities)

@@ -29,6 +29,9 @@ public class User {
     private String email;
     private String phoneNumber;
 
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword = false;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @Enumerated(EnumType.STRING)
     @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))
@@ -40,5 +43,6 @@ public class User {
         this.password = password;
         this.roles = new HashSet<>();
         this.roles.add(Role.ROLE_USER); // Mặc định ROLE_USER
+        this.mustChangePassword = true;
     }
 }

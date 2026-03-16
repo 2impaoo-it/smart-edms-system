@@ -36,6 +36,7 @@ public class DataSeeder implements CommandLineRunner {
             adminRoles.add(Role.ROLE_ADMIN);
             adminRoles.add(Role.ROLE_USER);
             admin.setRoles(adminRoles);
+            admin.setMustChangePassword(false);
             userRepository.save(admin);
             log.info("✅ Created admin user: username=admin, password=admin123");
 
@@ -50,6 +51,7 @@ public class DataSeeder implements CommandLineRunner {
             managerRoles.add(Role.ROLE_MANAGER);
             managerRoles.add(Role.ROLE_USER);
             manager.setRoles(managerRoles);
+            manager.setMustChangePassword(true);
             userRepository.save(manager);
             log.info("✅ Created manager user: username=manager, password=manager123");
 
@@ -63,6 +65,7 @@ public class DataSeeder implements CommandLineRunner {
             Set<Role> userRoles = new HashSet<>();
             userRoles.add(Role.ROLE_USER);
             user.setRoles(userRoles);
+            user.setMustChangePassword(true);
             userRepository.save(user);
             log.info("✅ Created regular user: username=user, password=user123");
 
