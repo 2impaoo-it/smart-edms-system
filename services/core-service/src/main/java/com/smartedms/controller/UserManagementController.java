@@ -6,7 +6,6 @@ import com.smartedms.service.UserManagementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -32,7 +31,7 @@ public class UserManagementController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Admin tạo tài khoản", description = "Admin nhập thông tin, chọn role. Hệ thống tự gán mật khẩu mặc định và bắt buộc đổi mật khẩu ở lần đăng nhập đầu")
+    @Operation(summary = "Admin tạo tài khoản", description = "Admin nhập thông tin, chọn role. Hệ thống tự gán mật khẩu mặc định và bắt buộc đổi mật khẩu ở lần đăng nhập đầu", requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Thông tin tài khoản cần tạo", required = true, content = @Content(schema = @Schema(implementation = CreateUserRequest.class))))
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Tạo tài khoản thành công", content = @Content(mediaType = "application/json", schema = @Schema(implementation = User.class))),
             @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
@@ -40,8 +39,7 @@ public class UserManagementController {
             @ApiResponse(responseCode = "403", description = "Không có quyền admin"),
             @ApiResponse(responseCode = "409", description = "Username hoặc email đã tồn tại")
     })
-    public User createUser(
-            @RequestBody(description = "Thông tin tài khoản cần tạo", required = true, content = @Content(schema = @Schema(implementation = CreateUserRequest.class))) @org.springframework.web.bind.annotation.RequestBody CreateUserRequest request) {
+    public User createUser(@RequestBody CreateUserRequest request) {
         return userManagementService.createByAdmin(request);
     }
 }
