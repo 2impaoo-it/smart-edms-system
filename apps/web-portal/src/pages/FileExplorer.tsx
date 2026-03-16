@@ -25,6 +25,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { FileItem, User } from "../lib/types";
 import { cn } from "../lib/utils";
 import { getFolderContents, createFolder, deleteFolder, getFolderTree } from "../services/folderService";
+import { uploadDocument, getDocumentStreamUrl } from "../services/documentService";
 
 interface FileExplorerProps {
     title: string;
@@ -89,8 +90,36 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
     
     const [contextMenu, setContextMenu] = useState<{ id: string, x: number, y: number } | null>(null);
     const [viewFileId, setViewFileId] = useState<string | null>(null);
+    const [pdfUrl, setPdfUrl] = useState<string | null>(null);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [breadcrumbs, setBreadcrumbs] = useState<{id: string, name: string}[]>([]);
+
+    // Fetch PDF Blob URL when viewing a file
+    useEffect(() => {
+        if (!viewFileId) {
+            setPdfUrl(null);
+            return;
+        }
+
+        let blobUrl: string | null = null;
+        const fetchPdf = async () => {
+            try {
+                const response = await getDocumentStreamUrl(viewFileId);
+                const blob = new Blob([response.data], { type: 'application/pdf' });
+                blobUrl = URL.createObjectURL(blob);
+                setPdfUrl(blobUrl);
+            } catch (error) {
+                console.error("Failed to fetch PDF", error);
+                toast.error("Không thể tải tài liệu hoặc tài liệu không phải là PDF.");
+            }
+        };
+
+        fetchPdf();
+
+        return () => {
+            if (blobUrl) URL.revokeObjectURL(blobUrl);
+        };
+    }, [viewFileId]);
 
     // Fetch data from API
     const fetchFilesAndFolders = async () => {
@@ -239,45 +268,32 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
         }
     };
 
-    const handleUpload = (e?: React.ChangeEvent<HTMLInputElement>) => {
-        let uploadedFileName = "Tai_Lieu_Moi_Upload.pdf";
-        if (e && e.target.files && e.target.files.length > 0) {
-            uploadedFileName = e.target.files[0].name;
-        }
+    const handleUpload = async (e?: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e || !e.target.files || e.target.files.length === 0) return;
         
+        const file = e.target.files[0];
         setIsUploadModalOpen(false);
 
-        const uploadTask = new Promise((resolve) => setTimeout(resolve, 1500));
-
-        toast.promise(
-            uploadTask, 
-            {
-                loading: `Đang tải lên: ${uploadedFileName}...`,
-                success: `Tải lên thành công!`,
-                error: 'Tải lên thất bại'
-            }
-        );
-        
-        uploadTask.then(() => {
-            toast.info("Dữ liệu file tải lên hiện chỉ là Mock UI. Nó sẽ biến mất khi tải lại trang do API chưa hỗ trợ.");
-            const fileExt = uploadedFileName.split('.').pop()?.toLowerCase();
-            let validExt: 'pdf' | 'docx' | 'xlsx' | 'image' = 'pdf';
-            if (fileExt === 'docx') validExt = 'docx';
-            else if (fileExt === 'xlsx') validExt = 'xlsx';
-            else if (['png', 'jpg', 'jpeg'].includes(fileExt || '')) validExt = 'image';
-
-            const newDoc: FileItem = {
-                id: `doc_${Date.now()}`,
-                name: uploadedFileName,
-                type: validExt,
-                size: '2.5 MB',
-                updatedAt: new Date().toLocaleDateString(),
-                owner: ownerId || user?.id || 'sys',
-                status: 'draft',
-                parentId: currentFolderId
-            };
-            setFiles(prev => [newDoc, ...prev]);
-        });
+        try {
+            const apiParentId = (currentFolderId === 'root' || currentFolderId === 'dept_root') ? null : currentFolderId;
+            
+            const uploadTask = uploadDocument(file, apiParentId);
+            
+            toast.promise(
+                uploadTask, 
+                {
+                    loading: `Đang tải lên: ${file.name}...`,
+                    success: `Tải lên thành công!`,
+                    error: 'Tải lên thất bại. Chỉ hỗ trợ định dạng PDF.'
+                }
+            );
+            
+            uploadTask.then(() => {
+                fetchFilesAndFolders();
+            });
+        } catch (error) {
+            console.error("Upload error", error);
+        }
     };
 
     const handleDelete = async (id: string) => {
@@ -616,20 +632,24 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
                                 </div>
                             </div>
                             <div className="flex-1 bg-slate-200/50 flex items-center justify-center p-8 overflow-auto">
-                                <div className="w-full max-w-2xl bg-white shadow-xl min-h-[800px] p-12 relative animate-in slide-in-from-bottom-8 duration-700">
-                                    <div className="text-center mb-10 border-b pb-6">
-                                        <h1 className="text-2xl font-bold uppercase mb-2">Cộng Hòa Xã Hội Chủ Nghĩa Việt Nam</h1>
-                                        <p className="font-bold underline">Độc lập - Tự do - Hạnh phúc</p>
+                                {pdfUrl ? (
+                                    <iframe src={pdfUrl} className="w-full h-full rounded-xl shadow-xl border-0" title="PDF Viewer" />
+                                ) : (
+                                    <div className="w-full max-w-2xl bg-white shadow-xl min-h-[800px] p-12 relative animate-in slide-in-from-bottom-8 duration-700">
+                                        <div className="text-center mb-10 border-b pb-6">
+                                            <h1 className="text-2xl font-bold uppercase mb-2">Cộng Hòa Xã Hội Chủ Nghĩa Việt Nam</h1>
+                                            <p className="font-bold underline">Độc lập - Tự do - Hạnh phúc</p>
+                                        </div>
+                                        <h2 className="text-xl font-bold text-center mb-8">{fileToView.name.replace('.pdf', '').replace('.docx', '')}</h2>
+                                        <div className="space-y-4 text-sm leading-relaxed text-justify">
+                                            <p>Đây là bản xem trước nội dung tài liệu. Hệ thống hỗ trợ đọc trực tiếp các định dạng PDF và Office mà không cần tải về máy.</p>
+                                            <div className="h-4 bg-slate-100 rounded w-full mt-8"></div>
+                                            <div className="h-4 bg-slate-100 rounded w-5/6"></div>
+                                            <div className="h-4 bg-slate-100 rounded w-full"></div>
+                                            <div className="h-4 bg-slate-100 rounded w-4/6"></div>
+                                        </div>
                                     </div>
-                                    <h2 className="text-xl font-bold text-center mb-8">{fileToView.name.replace('.pdf', '').replace('.docx', '')}</h2>
-                                    <div className="space-y-4 text-sm leading-relaxed text-justify">
-                                        <p>Đây là bản xem trước nội dung tài liệu. Hệ thống hỗ trợ đọc trực tiếp các định dạng PDF và Office mà không cần tải về máy.</p>
-                                        <div className="h-4 bg-slate-100 rounded w-full mt-8"></div>
-                                        <div className="h-4 bg-slate-100 rounded w-5/6"></div>
-                                        <div className="h-4 bg-slate-100 rounded w-full"></div>
-                                        <div className="h-4 bg-slate-100 rounded w-4/6"></div>
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         </motion.div>
                     </div>
