@@ -38,6 +38,10 @@ public class CategoryService {
         return tree;
     }
 
+    public List<Category> getByParentId(Long parentId) {
+        return folderRepository.findByParentIdAndIsDeletedFalse(parentId);
+    }
+
     public Category create(CategoryRequestDTO dto) {
         Category category = new Category();
         category.setName(dto.getName());

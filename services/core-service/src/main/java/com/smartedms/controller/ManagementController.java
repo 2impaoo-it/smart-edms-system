@@ -30,6 +30,11 @@ public class ManagementController {
         return categoryService.getTree();
     }
 
+    @GetMapping
+    public List<Category> getByParentId(@RequestParam(required = false) Long parentId) {
+        return categoryService.getByParentId(parentId);
+    }
+
     @Operation(summary = "Tạo thư mục mới", description = "Tạo một thư mục/danh mục mới")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
