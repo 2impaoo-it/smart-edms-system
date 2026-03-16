@@ -29,6 +29,10 @@ public class CategoryService {
         return roots.stream().map(this::buildTree).toList();
     }
 
+    public List<Category> getByParentId(Long parentId) {
+        return folderRepository.findByParentIdAndIsDeletedFalse(parentId);
+    }
+
     public Category create(CategoryRequestDTO dto) {
         Category category = new Category();
         category.setName(dto.getName());

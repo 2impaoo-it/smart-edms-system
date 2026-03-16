@@ -24,6 +24,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import type { FileItem, User } from "../lib/types";
 import { cn } from "../lib/utils";
+import { getFolderContents, createFolder } from "../services/folderService";
 
 interface FileExplorerProps {
     title: string;
@@ -90,6 +91,39 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
     const [viewFileId, setViewFileId] = useState<string | null>(null);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
+    // Fetch data from API
+    const fetchFilesAndFolders = async () => {
+        setIsLoading(true);
+        try {
+            // Map 'root' or 'dept_root' to null for backend
+            const apiParentId = (currentFolderId === 'root' || currentFolderId === 'dept_root') ? null : currentFolderId;
+            
+            const response = await getFolderContents(apiParentId);
+            // Ensure response data exists
+            const rawData = Array.isArray(response.data) ? response.data : response.data.content || [];
+            
+            // Map Backend Category to Frontend FileItem
+            const mappedData: FileItem[] = rawData.map((cat: any) => ({
+                id: String(cat.id),
+                name: cat.name,
+                type: 'folder', // for now we only get categories from this endpoint
+                size: '--',
+                updatedAt: new Date().toLocaleDateString(), // BE doesn't have updatedAt yet
+                owner: ownerId || user?.id || 'sys', // default owner
+                status: 'draft',
+                parentId: cat.parentId ? String(cat.parentId) : null,
+                isDeleted: cat.isDeleted
+            }));
+
+            setFiles(mappedData);
+        } catch (error) {
+            console.error("Fetch error:", error);
+            toast.error("Không thể tải danh sách tài liệu. Vui lòng kiểm tra kết nối mạng.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     // Click outside to close context menu
     useEffect(() => {
         const handleClickOutside = () => setContextMenu(null);
@@ -97,14 +131,10 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
         return () => window.removeEventListener('click', handleClickOutside);
     }, []);
 
-    // Simulate realtime loading when folder changes
+    // Fetch data when folder changes
     useEffect(() => {
-        setIsLoading(true);
-        const timer = setTimeout(() => {
-            setIsLoading(false);
-        }, 600); // 600ms of "Cyber Retrieval" time
-        return () => clearTimeout(timer);
-    }, [currentFolderId]);
+        fetchFilesAndFolders();
+    }, [currentFolderId, ownerId, title]);
 
     const currentFiles = useMemo(() => {
         const filtered = files.filter(f => {
@@ -167,28 +197,25 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
         setContextMenu({ id: fileId, x, y });
     };
 
-    const handleCreateFolder = (e: React.FormEvent) => {
+    const handleCreateFolder = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newFolderName.trim()) return;
         
-        toast.success(`Đã tạo thư mục: ${newFolderName}`);
-
-        const newFolder: FileItem = {
-            id: `folder_${Date.now()}`,
-            name: newFolderName,
-            type: 'folder',
-            size: '--',
-            updatedAt: new Date().toLocaleDateString(),
-            owner: ownerId || user?.id || 'sys',
-            status: 'draft',
-            parentId: currentFolderId
-        };
-        setFiles([newFolder, ...files]);
-        setShowNewFolderModal(false);
-        setNewFolderName("");
+        try {
+            await createFolder({ name: newFolderName, parentId: currentFolderId });
+            toast.success(`Đã tạo thư mục: ${newFolderName}`);
+            
+            // Re-fetch folders to get the real ID from DB
+            fetchFilesAndFolders();
+            
+            setShowNewFolderModal(false);
+            setNewFolderName("");
+        } catch (error: any) {
+            toast.error(error?.response?.data?.message || "Lỗi khi tạo thư mục");
+        }
     };
 
-    const handleMockUpload = (e?: React.ChangeEvent<HTMLInputElement>) => {
+    const handleUpload = (e?: React.ChangeEvent<HTMLInputElement>) => {
         let uploadedFileName = "Tai_Lieu_Moi_Upload.pdf";
         if (e && e.target.files && e.target.files.length > 0) {
             uploadedFileName = e.target.files[0].name;
@@ -392,7 +419,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
                                     key={file.id} 
                                     whileHover={{ y: -8, scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
-                                    onClick={(e) => handleFileClick(e, file)} 
+                                    onDoubleClick={(e) => handleFileClick(e, file)} 
                                     onContextMenu={(e) => handleContextMenu(e, file.id)}
                                     className={cn(
                                         "glass-panel rounded-[32px] group cursor-pointer hover:border-primary/40 transition-all shadow-xl bg-white/40 dark:bg-slate-900/40 relative",
@@ -531,7 +558,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
                                 <input 
                                     type="file" 
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                                    onChange={handleMockUpload} 
+                                    onChange={handleUpload} 
                                     title="Kéo thả hoặc click để chọn file"
                                 />
                                 <div className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300 text-primary">
@@ -540,7 +567,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
                                 <p className="text-sm font-black text-primary mb-2">Click hoặc kéo thả file vào đây</p>
                             </div>
 
-                            <button onClick={() => handleMockUpload()} className="w-full mt-6 py-4 rounded-2xl cyber-gradient text-white font-black text-[10px] uppercase tracking-widest shadow-neon hover:scale-[1.02] transition-transform">
+                            <button onClick={() => handleUpload()} className="w-full mt-6 py-4 rounded-2xl cyber-gradient text-white font-black text-[10px] uppercase tracking-widest shadow-neon hover:scale-[1.02] transition-transform">
                                 Bắt đầu tải lên
                             </button>
                         </motion.div>

@@ -24,6 +24,11 @@ public class ManagementController {
         return categoryService.getTree();
     }
 
+    @GetMapping
+    public List<Category> getByParentId(@RequestParam(required = false) Long parentId) {
+        return categoryService.getByParentId(parentId);
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Category create(@RequestBody CategoryRequestDTO dto) {
