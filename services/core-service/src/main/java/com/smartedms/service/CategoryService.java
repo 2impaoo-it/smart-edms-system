@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -26,7 +27,15 @@ public class CategoryService {
 
     public List<TreeDTO> getTree() {
         List<Category> roots = folderRepository.findByParentIdAndIsDeletedFalse(null);
-        return roots.stream().map(this::buildTree).toList();
+        List<TreeDTO> tree = new ArrayList<>(roots.stream().map(this::buildTree).toList());
+
+        // Add files that are uploaded directly at root level (folderId = null)
+        List<Document> rootDocuments = documentRepository.findByFolderIdAndIsDeletedFalse(null);
+        for (Document rootDocument : rootDocuments) {
+            tree.add(toDocumentNode(rootDocument));
+        }
+
+        return tree;
     }
 
     public Category create(CategoryRequestDTO dto) {
@@ -73,13 +82,28 @@ public class CategoryService {
         TreeDTO dto = new TreeDTO();
         dto.setId(folder.getId());
         dto.setName(folder.getName());
+        dto.setType("folder");
 
         List<Category> children = folderRepository.findByParentIdAndIsDeletedFalse(folder.getId());
         for (Category child : children) {
             dto.getChildren().add(buildTree(child));
         }
 
+        // Include active documents under current folder
+        List<Document> documents = documentRepository.findByFolderIdAndIsDeletedFalse(folder.getId());
+        for (Document document : documents) {
+            dto.getChildren().add(toDocumentNode(document));
+        }
+
+        return dto;
+    }
+
+    private TreeDTO toDocumentNode(Document document) {
+        TreeDTO dto = new TreeDTO();
+        dto.setId(document.getId());
+        dto.setName(document.getName());
+        dto.setType("file");
+        dto.setFilePath(document.getFilePath());
         return dto;
     }
 }
-
