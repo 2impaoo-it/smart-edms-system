@@ -19,10 +19,10 @@ export function MainLayout() {
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // Initialize from localStorage
+    // Lấy thông tin user từ localStorage, đã được kiểm tra ở ProtectedRoute
     const [currentUser] = useState<any>(() => {
         const stored = localStorage.getItem('user');
-        return stored ? JSON.parse(stored) : { id: "1", role: "MANAGER", name: "Mock User", email: "mock@mock.com", department: "IT", avatar: "", status: "active" }; // Fallback for dev mode
+        return stored ? JSON.parse(stored) : null; 
     });
 
     const currentRole: UserRole = currentUser?.role || 'STAFF';

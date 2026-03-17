@@ -18,12 +18,15 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/documents")
@@ -34,6 +37,12 @@ public class DocumentController {
 
     public DocumentController(DocumentService documentService) {
         this.documentService = documentService;
+    }
+
+    @GetMapping
+    @Operation(summary = "Lấy danh sách các file trong folder", security = @SecurityRequirement(name = "bearerAuth"))
+    public List<Document> getByFolderId(@RequestParam(required = false) Long folderId) {
+        return documentService.getByFolderId(folderId);
     }
 
     @PostMapping(consumes = "multipart/form-data")
@@ -62,5 +71,12 @@ public class DocumentController {
     })
     public ResponseEntity<InputStreamResource> view(@PathVariable Long id) {
         return documentService.streamPdf(id);
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Xóa tài liệu", description = "Xóa mềm (soft delete) tài liệu theo id", security = @SecurityRequirement(name = "bearerAuth"))
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id) {
+        documentService.softDelete(id);
     }
 }

@@ -67,7 +67,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     || path.startsWith("/v3/api-docs");
             if (currentUser.isMustChangePassword() && !isAllowedPathWhenForceChange) {
                 response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                response.setContentType("application/json");
+                response.setContentType("application/json;charset=UTF-8");
                 response.getWriter().write("{\"message\":\"Bạn phải đổi mật khẩu ở lần đăng nhập đầu tiên\"}");
                 return;
             }

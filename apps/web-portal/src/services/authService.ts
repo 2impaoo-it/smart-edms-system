@@ -7,6 +7,7 @@ export interface LoginPayload {
 
 export interface LoginResponse {
   token: string;
+  mustChangePassword?: boolean;
 }
 
 /**
@@ -14,6 +15,9 @@ export interface LoginResponse {
  */
 export const login = (payload: LoginPayload) =>
   axiosClient.post<LoginResponse>("/auth/login", payload);
+
+export const changePasswordFirstTime = (payload: any) =>
+  axiosClient.post("/auth/change-password-first-time", payload);
 
 /**
  * Gọi API đăng xuất (nếu backend có endpoint này).

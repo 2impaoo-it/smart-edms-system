@@ -43,6 +43,11 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Không
                                                                                                               // dùng
                                                                                                               // session
+                .exceptionHandling(exception -> exception.authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(org.springframework.http.HttpStatus.UNAUTHORIZED.value());
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.getWriter().write("{\"message\":\"Không có quyền truy cập hoặc token không hợp lệ\"}");
+                }))
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS).permitAll() // allow CORS preflight

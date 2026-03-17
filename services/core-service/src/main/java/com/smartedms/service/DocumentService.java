@@ -29,6 +29,7 @@ import java.io.InputStream;
 import java.time.LocalDate;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.List;
 
 @Service
 public class DocumentService {
@@ -47,6 +48,17 @@ public class DocumentService {
         this.documentRepository = documentRepository;
         this.minioClient = minioClient;
         this.defaultBucket = defaultBucket;
+    }
+
+    public List<Document> getByFolderId(Long folderId) {
+        return documentRepository.findByFolderIdAndIsDeletedFalse(folderId);
+    }
+
+    public void softDelete(Long id) {
+        Document document = documentRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+        document.setDeleted(true);
+        documentRepository.save(document);
     }
 
     public Document uploadPdf(MultipartFile file, Long folderId) {

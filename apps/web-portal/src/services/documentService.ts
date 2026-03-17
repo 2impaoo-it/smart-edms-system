@@ -20,3 +20,11 @@ export const getDocumentStreamUrl = (id: string) => {
     responseType: "blob",
   });
 };
+
+export const getFolderDocuments = (folderId: string | null) => {
+  return axiosClient.get("/documents", { params: { folderId } });
+};
+
+export const deleteDocument = (id: string) => {
+  return axiosClient.delete(`/documents/${id}`);
+};
