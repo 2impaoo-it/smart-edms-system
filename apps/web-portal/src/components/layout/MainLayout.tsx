@@ -3,6 +3,7 @@ import { Sidebar } from "./Sidebar";
 import type { UserRole } from "../../lib/types";
 import { FileExplorer } from "../../pages/FileExplorer";
 import { PlaceholderPage } from "../../pages/PlaceholderPage";
+import { AdminDashboard, ManagerDashboard, StaffDashboard } from "../../pages/Dashboard";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 
 export interface AppNotification {
@@ -76,6 +77,12 @@ export function MainLayout() {
         if (location.pathname === '/dashboard/users') return <PlaceholderPage title="Quản lý Người dùng" />;
         if (location.pathname === '/dashboard/storage') return <PlaceholderPage title="Quản lý Lưu trữ" />;
         if (location.pathname === '/dashboard/settings') return <PlaceholderPage title="Cài đặt Hệ thống" />;
+        
+        if (location.pathname === '/dashboard' || location.pathname === '/dashboard/') {
+            if (currentRole === 'ADMIN') return <AdminDashboard user={currentUser} onNavigate={navigate} />;
+            if (currentRole === 'MANAGER') return <ManagerDashboard user={currentUser} onNavigate={navigate} />;
+            return <StaffDashboard user={currentUser} onNavigate={navigate} />;
+        }
         
         return <PlaceholderPage title={`Trang Tổng quan (${currentRole})`} />;
     };

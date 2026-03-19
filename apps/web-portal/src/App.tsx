@@ -21,7 +21,7 @@ const router = createBrowserRouter([
                 children: [
                     {
                         index: true,
-                        element: <PlaceholderPage title="Dashboard Tổng quan" />,
+                        element: null, // Routed in MainLayout
                     },
                     {
                         path: "files",
