@@ -12,12 +12,6 @@ import {
     
     Search,
     Filter,
-    
-    FolderPlus,
-    
-    
-    
-    
     Eye,
     Zap,
     Download,
@@ -28,16 +22,14 @@ import {
     MessageCircle,
     Send,
     MoreHorizontal,
-    Bell,
-    UserCircle2
+    Bell
 } from "lucide-react";
 
 import { cn } from "../lib/utils";
 import { SignerWorkspace } from "./SignerWorkspace";
 
 // --- 1. ADMIN DASHBOARD ---
-export function AdminDashboard({ user, onNavigate }: { user?: any, onNavigate: (path: string) => void }) {
-    const safeUser = user || { id: 'guest', name: 'Admin' };
+export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: string) => void }) {
     return (
         <div className="space-y-6 lg:space-y-8 animate-in fade-in duration-700 pb-20">
             {/* Stats Overview */}
@@ -125,7 +117,7 @@ export function AdminDashboard({ user, onNavigate }: { user?: any, onNavigate: (
 }
 
 // --- 2. MANAGER DASHBOARD ---
-export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: (path: string) => void }) {
+export function ManagerDashboard({ user }: { user: any, onNavigate: (path: string) => void }) {
     const safeUser = user || { id: 'guest', name: 'Quản lý' };
     const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
     const [files, setFiles] = useState<any[]>([]);
@@ -421,7 +413,7 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
     );
 }
 // --- 3. STAFF DASHBOARD (NEWS & COMMUNICATION) ---
-export function StaffDashboard({ user, onNavigate }: { user: any, onNavigate: (path: string) => void }) {
+export function StaffDashboard({ user }: { user: any, onNavigate: (path: string) => void }) {
     const safeUser = user || { id: 'guest', name: 'Nhân viên', department: 'Phòng IT' };
     
     // --- Mock Data ---
