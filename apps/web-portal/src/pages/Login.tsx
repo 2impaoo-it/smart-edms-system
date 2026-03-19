@@ -90,8 +90,19 @@ export function Login() {
         setTimeout(() => navigate("/dashboard"), 800);
         return "Đăng nhập thành công! Đang chuyển hướng...";
       },
-      error: (err: any) =>
-        err.message || "Đăng nhập thất bại. Vui lòng thử lại.",
+      error: (err: any) => {
+        const status = err.response?.status;
+        const msg = err.response?.data?.message;
+        
+        if (status === 403 && msg === "Bạn phải đổi mật khẩu ở lần đăng nhập đầu tiên") {
+          setShowPasswordChange(true);
+          return "Tài khoản bảo mật: Yêu cầu cập nhật mật khẩu mới.";
+        }
+        if (status === 401) {
+          return "Sai email hoặc mật khẩu. Vui lòng kiểm tra lại.";
+        }
+        return msg || "Đăng nhập thất bại. Hệ thống không phản hồi.";
+      },
     });
 
     promiseInstance.finally(() => {

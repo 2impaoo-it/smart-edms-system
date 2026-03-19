@@ -28,7 +28,9 @@ axiosClient.interceptors.response.use(
     if (error.response?.status === 401 || (error.response?.status === 403 && error.response?.data?.message === "Bạn phải đổi mật khẩu ở lần đăng nhập đầu tiên")) {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
-      window.location.href = "/";
+      if (window.location.pathname !== "/") {
+        window.location.href = "/";
+      }
     }
     return Promise.reject(error);
   },
