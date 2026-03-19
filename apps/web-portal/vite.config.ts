@@ -12,6 +12,9 @@ export default defineConfig(({ mode }) => {
     server: {
       host: true, // Listen on all network interfaces for Docker
       port: 5173,
+      watch: {
+        usePolling: true,
+      },
       proxy: {
         '/api': {
           target: targetUrl,
