@@ -24,9 +24,12 @@ import {
     
     ShieldCheck,
     X,
-    
-    
-    
+    Heart,
+    MessageCircle,
+    Send,
+    MoreHorizontal,
+    Bell,
+    UserCircle2
 } from "lucide-react";
 
 import { cn } from "../lib/utils";
@@ -417,111 +420,325 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
         </div>
     );
 }
-// --- 3. STAFF DASHBOARD ---
+// --- 3. STAFF DASHBOARD (NEWS & COMMUNICATION) ---
 export function StaffDashboard({ user, onNavigate }: { user: any, onNavigate: (path: string) => void }) {
-    const safeUser = user || { id: 'guest', name: 'Nhân viên' };
-    const files: any[] = [];
+    const safeUser = user || { id: 'guest', name: 'Nhân viên', department: 'Phòng IT' };
+    
+    // --- Mock Data ---
+    const [posts, setPosts] = useState([
+        { 
+            id: 1, 
+            author: 'Phạm Trưởng Phòng', 
+            role: 'Trưởng phòng ' + (safeUser.department || 'IT'), 
+            time: '2 giờ trước', 
+            content: 'Thông báo nội bộ: Tuần sau chúng ta sẽ có buổi training về Security lúc 9h sáng thứ 2. Mọi người sắp xếp thời gian tham gia đầy đủ nhé.', 
+            likes: 12, 
+            comments: [
+                { id: 101, author: 'Trần Nhân Viên', text: 'Đã nhận thông tin sếp ạ.', time: '1 giờ trước' }
+            ], 
+            isLiked: false 
+        },
+        { 
+            id: 2, 
+            author: 'Hệ thống Nhân Sự', 
+            role: 'Thông báo', 
+            time: 'Hôm qua', 
+            content: 'Chúc mừng sinh nhật các thành viên có ngày sinh trong tháng này! Bộ phận HR đã chuẩn bị quà tại quầy lễ tân. 🎂🎉', 
+            likes: 45, 
+            comments: [], 
+            isLiked: true 
+        }
+    ]);
+
+    const [contacts] = useState([
+        { id: 'u1', name: 'Trần Đồng Nghiệp', role: 'Developer', isOnline: true },
+        { id: 'u2', name: 'Lê Kỹ Thuật', role: 'DevOps', isOnline: true },
+        { id: 'u3', name: 'Nguyễn Tester', role: 'QA', isOnline: false },
+    ]);
+
+    // --- State ---
+    const [activeChatId, setActiveChatId] = useState<string | null>(null);
+    const [chatMessages, setChatMessages] = useState<Record<string, {sender: string, text: string, time: string}[]>>({
+        'u1': [
+            { sender: 'u1', text: 'Ê file tài liệu dự án EDMS hôm qua cậu up lên thư mục nào vậy?', time: '09:15' },
+            { sender: 'me', text: 'Tớ để trong thư mục team Dev nhé, check lại đi.', time: '09:16' }
+        ]
+    });
+    const [newMessage, setNewMessage] = useState("");
+    const [newCommentText, setNewCommentText] = useState("");
+    const [activeCommentPostId, setActiveCommentPostId] = useState<number | null>(null);
+
+    // --- Actions ---
+    const handleLike = (postId: number) => {
+        setPosts(prev => prev.map(p => {
+            if (p.id === postId) {
+                return { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 };
+            }
+            return p;
+        }));
+    };
+
+    const handleSendComment = (postId: number) => {
+        if (!newCommentText.trim()) return;
+        setPosts(prev => prev.map(p => {
+            if (p.id === postId) {
+                return { 
+                    ...p, 
+                    comments: [...p.comments, { id: Date.now(), author: safeUser.name, text: newCommentText, time: 'Vừa xong' }] 
+                };
+            }
+            return p;
+        }));
+        setNewCommentText("");
+    };
+
+    const handleSendMessage = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newMessage.trim() || !activeChatId) return;
+        
+        setChatMessages(prev => ({
+            ...prev,
+            [activeChatId]: [
+                ...(prev[activeChatId] || []),
+                { sender: 'me', text: newMessage, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }
+            ]
+        }));
+        setNewMessage("");
+    };
+
+    const activeChatUser = contacts.find(c => c.id === activeChatId);
 
     return (
-        <div className="space-y-6 lg:space-y-8 animate-in fade-in duration-700 pb-20">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="space-y-6 lg:space-y-8 animate-in fade-in duration-700 pb-32">
+            
+            {/* Header section */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/40 glass-panel p-8 rounded-[40px] shadow-sm">
                 <div>
-                    <h2 className="text-3xl font-black tracking-tighter uppercase italic gradient-text">Kho tài liệu cá nhân, {safeUser.name}!</h2>
-                    <p className="text-sm text-muted-foreground font-medium mt-1">Quản lý và theo dõi tiến độ phê duyệt tài liệu của bạn.</p>
+                    <h2 className="text-3xl font-black tracking-tighter uppercase italic gradient-text">Bảng Tin & Nội Bộ</h2>
+                    <p className="text-sm text-muted-foreground font-medium mt-1">
+                        Không gian trao đổi tin tức nội bộ khu vực <span className="text-primary font-black uppercase">{safeUser.department || 'Phòng Ban'}</span>
+                    </p>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
-                    <button onClick={() => onNavigate('/dashboard/files')} className="flex-1 sm:flex-none glass-panel px-5 py-3 rounded-2xl text-[10px] font-black flex items-center justify-center gap-2 border-white/60 hover:bg-white transition-all shadow-sm">
-                        <FolderPlus className="w-4 h-4 text-primary" /> MỞ KHO LƯU TRỮ
+                    <button className="glass-panel px-5 py-3 rounded-2xl text-[10px] font-black flex items-center justify-center gap-2 border-white/60 hover:bg-white transition-all shadow-sm">
+                        <Bell className="w-4 h-4 text-warning fill-warning/20" /> THÔNG BÁO MỚI (2)
                     </button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {[
-                    { label: "Tổng tài liệu", val: files.filter(f => f.owner === safeUser.id && f.type !== 'folder').length, color: "text-primary", bg: "bg-primary/10" },
-                    { label: "Đang chờ duyệt", val: files.filter(f => f.owner === safeUser.id && f.status === 'pending').length, color: "text-warning", bg: "bg-warning/10" },
-                    { label: "Đã hoàn tất", val: files.filter(f => f.owner === safeUser.id && f.status === 'signed').length, color: "text-success", bg: "bg-success/10" },
-                    { label: "Bị từ chối", val: 0, color: "text-destructive", bg: "bg-destructive/10" },
-                ].map((s, i) => (
-                    <motion.div 
-                        key={i} 
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.1 }}
-                        className="glass-panel p-6 rounded-3xl shadow-sm bg-white/40 border-white/60"
-                    >
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className={cn("w-2 h-2 rounded-full", s.bg, s.color === "text-primary" ? "bg-primary" : s.color === "text-warning" ? "bg-warning" : s.color === "text-destructive" ? "bg-destructive" : "bg-success")} />
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{s.label}</p>
-                        </div>
-                        <h3 className={cn("text-3xl font-black tracking-tighter", s.color)}>{s.val}</h3>
-                    </motion.div>
-                ))}
-            </div>
-
-            <div className="glass-panel rounded-[40px] overflow-hidden shadow-2xl bg-white/40 border-white/60">
-                <div className="p-8 border-b border-white/10 flex justify-between items-center bg-white/20">
-                    <div>
-                        <h3 className="text-xl font-black tracking-tighter uppercase italic">Tiến độ phê duyệt gần đây</h3>
-                        <p className="text-[10px] font-bold text-muted-foreground mt-1 uppercase tracking-widest">Cập nhật realtime</p>
-                    </div>
-                    <button onClick={() => onNavigate('/dashboard/files')} className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline">
-                        Xem tất cả
-                    </button>
-                </div>
-                <div className="overflow-x-auto scrollbar-hide p-2">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="uppercase text-[9px] font-black tracking-[0.2em] text-muted-foreground">
-                                <th className="px-8 py-5">Tên tài liệu</th>
-                                <th className="px-8 py-5">Cập nhật lần cuối</th>
-                                <th className="px-8 py-5 text-center">Trạng thái</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {files.filter(f => f.owner === safeUser.id && f.type !== 'folder').map((file, i) => (
-                                <motion.tr 
-                                    key={file.id} 
-                                    onClick={() => onNavigate('/dashboard/files')}
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    transition={{ delay: i * 0.05 }}
-                                    className="border-t border-white/20 hover:bg-white/60 transition-all group cursor-pointer"
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                {/* LEFT COL: NEWS FEED */}
+                <div className="lg:col-span-2 space-y-6">
+                    {posts.map(post => (
+                        <div key={post.id} className="glass-panel rounded-[32px] p-0 overflow-hidden shadow-xl bg-white/60">
+                            {/* Post Header */}
+                            <div className="p-6 flex justify-between items-start border-b border-white/40 bg-white/20">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-black text-xl shadow-lg">
+                                        {post.author.charAt(0)}
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-base">{post.author}</h4>
+                                        <div className="flex items-center gap-2 text-[10px] uppercase font-bold text-muted-foreground mt-0.5">
+                                            <span className="text-primary/70">{post.role}</span>
+                                            <span>•</span>
+                                            <span>{post.time}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button className="p-2 hover:bg-white/50 rounded-full transition-colors">
+                                    <MoreHorizontal className="w-5 h-5 text-slate-400" />
+                                </button>
+                            </div>
+                            
+                            {/* Post Content */}
+                            <div className="p-6 text-sm leading-relaxed whitespace-pre-line text-slate-700 font-medium">
+                                {post.content}
+                            </div>
+                            
+                            {/* Actions */}
+                            <div className="px-6 py-4 flex items-center gap-6 border-t border-slate-100/50">
+                                <button 
+                                    onClick={() => handleLike(post.id)}
+                                    className={cn("flex items-center gap-2 text-xs font-black uppercase transition-all", post.isLiked ? "text-pink-500" : "text-muted-foreground hover:text-slate-700")}
                                 >
-                                    <td className="px-8 py-5 flex items-center gap-4">
-                                        <div className="p-3 rounded-2xl bg-white shadow-sm border border-slate-100 group-hover:text-primary transition-colors">
-                                            <FileText className="w-6 h-6" />
-                                        </div>
-                                        <div>
-                                            <span className="text-sm font-black group-hover:text-primary transition-colors block">{file.name}</span>
-                                            <span className="text-[10px] font-medium text-muted-foreground">{file.size}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-8 py-5">
-                                        <div className="flex items-center gap-2 text-muted-foreground">
-                                            <Clock className="w-3.5 h-3.5" />
-                                            <span className="text-xs font-bold">{file.updatedAt}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-8 py-5">
-                                        <div className="flex justify-center">
-                                            {file.status === 'signed' ? (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-success/10 text-success border border-success/20 text-[9px] font-black uppercase tracking-widest shadow-sm">
-                                                    <CheckCircle2 className="w-3 h-3" /> Đã hoàn tất
-                                                </span>
+                                    <Heart className={cn("w-5 h-5", post.isLiked ? "fill-pink-500 scale-110" : "")} /> 
+                                    {post.likes} Yêu Thích
+                                </button>
+                                <button 
+                                    onClick={() => setActiveCommentPostId(activeCommentPostId === post.id ? null : post.id)}
+                                    className="flex items-center gap-2 text-xs font-black uppercase text-muted-foreground hover:text-primary transition-all"
+                                >
+                                    <MessageCircle className="w-5 h-5" /> 
+                                    {post.comments.length} Bình Luận
+                                </button>
+                            </div>
+
+                            {/* Comments Section */}
+                            <AnimatePresence>
+                                {activeCommentPostId === post.id && (
+                                    <motion.div 
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        className="bg-slate-50/50 border-t border-slate-100/50 overflow-hidden"
+                                    >
+                                        <div className="p-6 space-y-4">
+                                            {post.comments.length === 0 ? (
+                                                <p className="text-xs text-center text-muted-foreground italic">Chưa có bình luận nào.</p>
                                             ) : (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-warning/10 text-warning border border-warning/20 text-[9px] font-black uppercase tracking-widest shadow-sm">
-                                                    <Clock className="w-3 h-3" /> Đang duyệt
-                                                </span>
+                                                post.comments.map(cmt => (
+                                                    <div key={cmt.id} className="flex gap-3">
+                                                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center shrink-0 font-bold text-xs text-slate-500">
+                                                            {cmt.author.charAt(0)}
+                                                        </div>
+                                                        <div className="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm flex-1">
+                                                            <div className="flex justify-between items-end mb-1">
+                                                                <h5 className="font-bold text-xs">{cmt.author}</h5>
+                                                                <span className="text-[9px] text-muted-foreground uppercase">{cmt.time}</span>
+                                                            </div>
+                                                            <p className="text-sm font-medium text-slate-600">{cmt.text}</p>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                            
+                                            <div className="flex gap-2 pt-2 mt-4 border-t border-slate-200/50">
+                                                <input 
+                                                    type="text" 
+                                                    value={newCommentText}
+                                                    onChange={e => setNewCommentText(e.target.value)}
+                                                    onKeyDown={e => e.key === 'Enter' && handleSendComment(post.id)}
+                                                    placeholder="Viết bình luận..." 
+                                                    className="flex-1 bg-white border-none rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-primary/20 shadow-inner"
+                                                />
+                                                <button onClick={() => handleSendComment(post.id)} className="p-2.5 bg-primary text-white rounded-xl shadow-md hover:scale-105 transition-transform">
+                                                    <Send className="w-4 h-4 ml-0.5" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    ))}
+                </div>
+
+                {/* RIGHT COL: ACTIVE USERS & CONTACTS */}
+                <div className="space-y-6">
+                    <div className="glass-panel p-6 rounded-[32px] bg-white/40 shadow-xl border-white/60">
+                        <h3 className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-6">Đồng Nghiệp Trực Tuyến</h3>
+                        <div className="space-y-4">
+                            {contacts.map(contact => (
+                                <div key={contact.id} className="flex items-center justify-between group">
+                                    <div className="flex items-center gap-3">
+                                        <div className="relative">
+                                            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-600">
+                                                {contact.name.charAt(0)}
+                                            </div>
+                                            {contact.isOnline && (
+                                                <div className="absolute bottom-0 right-0 w-3 h-3 bg-success border-2 border-white rounded-full shadow-sm" />
                                             )}
                                         </div>
-                                    </td>
-                                </motion.tr>
+                                        <div>
+                                            <p className="text-sm font-bold leading-none mb-1">{contact.name}</p>
+                                            <p className="text-[10px] text-muted-foreground uppercase">{contact.role}</p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => setActiveChatId(contact.id)}
+                                        className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-all opacity-0 group-hover:opacity-100"
+                                    >
+                                        <MessageCircle className="w-4 h-4" />
+                                    </button>
+                                </div>
                             ))}
-                        </tbody>
-                    </table>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            {/* --- BALLOON CHAT SYSTEM (Messenger Heads) --- */}
+            {/* The Chat Head Balloon */}
+            <AnimatePresence>
+                {activeChatId && (
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.5, y: 100 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.5, y: 100 }}
+                        drag
+                        dragConstraints={{ left: -300, right: 0, top: -500, bottom: 0 }}
+                        dragElastic={0.1}
+                        className="fixed bottom-6 right-6 z-[100] cursor-grab active:cursor-grabbing"
+                        style={{ perspective: 1000 }}
+                    >
+                        <div className="relative">
+                            {/* Balloon avatar */}
+                            <div className="w-16 h-16 rounded-full bg-white shadow-2xl border-4 border-primary/20 flex items-center justify-center text-primary font-black text-2xl relative overflow-hidden group">
+                                <div className="absolute inset-0 cyber-gradient opacity-10 group-hover:opacity-20 transition-opacity" />
+                                {activeChatUser?.name.charAt(0)}
+                                <div className="absolute top-1 right-1 w-3.5 h-3.5 bg-success border-2 border-white rounded-full" />
+                            </div>
+                            
+                            {/* Close badge */}
+                            <button 
+                                onClick={() => setActiveChatId(null)}
+                                className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
+
+                            {/* Chat Window Panel attached to Balloon */}
+                            <div className="absolute bottom-20 right-0 w-[340px] glass-panel bg-white/95 backdrop-blur-3xl rounded-[32px] shadow-[0_32px_128px_rgba(0,0,0,0.3)] border-white/60 overflow-hidden flex flex-col cursor-default h-[450px]">
+                                {/* Chat Header */}
+                                <div className="p-4 bg-primary/5 border-b border-primary/10 flex items-center gap-3 shrink-0">
+                                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                                        {activeChatUser?.name.charAt(0)}
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-sm leading-tight">{activeChatUser?.name}</h4>
+                                        <p className="text-[10px] text-success uppercase font-black tracking-widest mt-0.5">Đang trực tuyến</p>
+                                    </div>
+                                </div>
+                                
+                                {/* Chat Body */}
+                                <div className="flex-1 p-4 overflow-y-auto flex flex-col gap-3 scrollbar-hide">
+                                    <div className="text-center my-2 text-[10px] font-bold text-muted-foreground uppercase opacity-50 bg-slate-100 rounded-full py-1 px-3 w-max mx-auto">
+                                        Chuẩn mã hóa End-to-End
+                                    </div>
+                                    {(chatMessages[activeChatId] || []).map((msg, i) => {
+                                        const isMe = msg.sender === 'me';
+                                        return (
+                                            <div key={i} className={cn("flex flex-col max-w-[80%]", isMe ? "self-end items-end" : "self-start items-start")}>
+                                                <div className={cn("px-4 py-2.5 rounded-2xl shadow-sm text-sm font-medium", isMe ? "bg-primary text-white rounded-br-sm" : "bg-slate-100 text-slate-800 rounded-bl-sm")}>
+                                                    {msg.text}
+                                                </div>
+                                                <span className="text-[9px] text-muted-foreground mt-1 mx-1">{msg.time}</span>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+
+                                {/* Chat Input */}
+                                <form onSubmit={handleSendMessage} className="p-3 bg-slate-50 border-t border-slate-100 flex items-center gap-2 shrink-0">
+                                    <input 
+                                        type="text" 
+                                        value={newMessage}
+                                        onChange={e => setNewMessage(e.target.value)}
+                                        placeholder="Nhắn tin riêng tư..." 
+                                        className="flex-1 bg-white border-none rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 shadow-sm"
+                                    />
+                                    <button type="submit" disabled={!newMessage.trim()} className="w-10 h-10 rounded-xl cyber-gradient text-white flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none">
+                                        <Send className="w-4 h-4 ml-0.5" />
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
         </div>
     );
 }
