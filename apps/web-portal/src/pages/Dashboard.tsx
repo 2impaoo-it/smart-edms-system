@@ -33,7 +33,8 @@ import { cn } from "../lib/utils";
 import { SignerWorkspace } from "./SignerWorkspace";
 
 // --- 1. ADMIN DASHBOARD ---
-export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: string) => void }) {
+export function AdminDashboard({ user, onNavigate }: { user?: any, onNavigate: (path: string) => void }) {
+    const safeUser = user || { id: 'guest', name: 'Admin' };
     return (
         <div className="space-y-6 lg:space-y-8 animate-in fade-in duration-700 pb-20">
             {/* Stats Overview */}
@@ -121,7 +122,8 @@ export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: 
 }
 
 // --- 2. MANAGER DASHBOARD ---
-export function ManagerDashboard({ user }: { user: any, onNavigate: (path: string) => void }) {
+export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: (path: string) => void }) {
+    const safeUser = user || { id: 'guest', name: 'Quản lý' };
     const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
     const [files, setFiles] = useState<any[]>([]);
     const [showFilters, setShowFilters] = useState(false);
@@ -340,7 +342,7 @@ export function ManagerDashboard({ user }: { user: any, onNavigate: (path: strin
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-3xl font-black tracking-tighter">Trung tâm Phê duyệt</h2>
-                    <p className="text-sm text-muted-foreground font-medium">Chào sếp <span className="text-primary font-black uppercase">{user.name}</span>. Bạn có tài liệu mới.</p>
+                    <p className="text-sm text-muted-foreground font-medium">Chào sếp <span className="text-primary font-black uppercase">{safeUser.name}</span>. Bạn có tài liệu mới.</p>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
                     <button onClick={() => setShowFilters(!showFilters)} className={cn("flex-1 sm:flex-none glass-panel px-5 py-3 rounded-2xl text-[10px] font-black flex items-center justify-center gap-2 transition-all shadow-sm", showFilters ? "bg-white border-primary text-primary" : "border-white/60 hover:bg-white")}>
@@ -417,13 +419,14 @@ export function ManagerDashboard({ user }: { user: any, onNavigate: (path: strin
 }
 // --- 3. STAFF DASHBOARD ---
 export function StaffDashboard({ user, onNavigate }: { user: any, onNavigate: (path: string) => void }) {
+    const safeUser = user || { id: 'guest', name: 'Nhân viên' };
     const files: any[] = [];
 
     return (
         <div className="space-y-6 lg:space-y-8 animate-in fade-in duration-700 pb-20">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h2 className="text-3xl font-black tracking-tighter uppercase italic gradient-text">Kho tài liệu cá nhân</h2>
+                    <h2 className="text-3xl font-black tracking-tighter uppercase italic gradient-text">Kho tài liệu cá nhân, {safeUser.name}!</h2>
                     <p className="text-sm text-muted-foreground font-medium mt-1">Quản lý và theo dõi tiến độ phê duyệt tài liệu của bạn.</p>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
@@ -435,9 +438,9 @@ export function StaffDashboard({ user, onNavigate }: { user: any, onNavigate: (p
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {[
-                    { label: "Tổng tài liệu", val: files.filter(f => f.owner === user.id && f.type !== 'folder').length, color: "text-primary", bg: "bg-primary/10" },
-                    { label: "Đang chờ duyệt", val: files.filter(f => f.owner === user.id && f.status === 'pending').length, color: "text-warning", bg: "bg-warning/10" },
-                    { label: "Đã hoàn tất", val: files.filter(f => f.owner === user.id && f.status === 'signed').length, color: "text-success", bg: "bg-success/10" },
+                    { label: "Tổng tài liệu", val: files.filter(f => f.owner === safeUser.id && f.type !== 'folder').length, color: "text-primary", bg: "bg-primary/10" },
+                    { label: "Đang chờ duyệt", val: files.filter(f => f.owner === safeUser.id && f.status === 'pending').length, color: "text-warning", bg: "bg-warning/10" },
+                    { label: "Đã hoàn tất", val: files.filter(f => f.owner === safeUser.id && f.status === 'signed').length, color: "text-success", bg: "bg-success/10" },
                     { label: "Bị từ chối", val: 0, color: "text-destructive", bg: "bg-destructive/10" },
                 ].map((s, i) => (
                     <motion.div 
@@ -476,7 +479,7 @@ export function StaffDashboard({ user, onNavigate }: { user: any, onNavigate: (p
                             </tr>
                         </thead>
                         <tbody>
-                            {files.filter(f => f.owner === user.id && f.type !== 'folder').map((file, i) => (
+                            {files.filter(f => f.owner === safeUser.id && f.type !== 'folder').map((file, i) => (
                                 <motion.tr 
                                     key={file.id} 
                                     onClick={() => onNavigate('/dashboard/files')}
