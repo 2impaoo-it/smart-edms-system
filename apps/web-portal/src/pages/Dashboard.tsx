@@ -21,8 +21,7 @@ import {
     Heart,
     MessageCircle,
     Send,
-    MoreHorizontal,
-    Bell
+    MoreHorizontal
 } from "lucide-react";
 
 import { cn } from "../lib/utils";
@@ -812,11 +811,7 @@ export function StaffDashboard({ user }: { user: any, onNavigate: (path: string)
                         Không gian trao đổi tin tức nội bộ khu vực <span className="text-primary font-black uppercase">{safeUser.department || 'Phòng Ban'}</span>
                     </p>
                 </div>
-                <div className="flex gap-2 w-full sm:w-auto">
-                    <button className="glass-panel px-5 py-3 rounded-2xl text-[10px] font-black flex items-center justify-center gap-2 border-white/60 hover:bg-white transition-all shadow-sm">
-                        <Bell className="w-4 h-4 text-warning fill-warning/20" /> THÔNG BÁO MỚI (2)
-                    </button>
-                </div>
+
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
