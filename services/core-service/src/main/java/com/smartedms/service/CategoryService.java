@@ -40,28 +40,48 @@ public class CategoryService {
     }
 
     /**
-     * Lấy cây thư mục theo quyền của user hiện tại:
-     * 1. Thư mục cá nhân gốc của user (PERSONAL, parentId = null, ownerId = userId)
-     * 2. Thư mục phòng ban mà user có quyền (là owner hoặc được share)
+     * Lấy toàn bộ cây thư mục mà user có quyền (cả cá nhân + phòng ban).
      */
     public List<TreeDTO> getTree(Long userId) {
         List<TreeDTO> tree = new ArrayList<>();
+        tree.addAll(getPersonalTree(userId));
+        tree.addAll(getDepartmentTree(userId));
+        return tree;
+    }
 
-        // 1. Thư mục cá nhân gốc
+    /**
+     * Lấy cây thư mục CÁ NHÂN: chỉ thư mục do user tạo với type PERSONAL.
+     */
+    public List<TreeDTO> getPersonalTree(Long userId) {
+        List<TreeDTO> tree = new ArrayList<>();
+
         List<Category> personalRoots = folderRepository
                 .findByOwnerIdAndFolderTypeAndParentIdIsNullAndIsDeletedFalse(userId, FolderType.PERSONAL);
         for (Category root : personalRoots) {
             tree.add(buildTree(root, userId));
         }
 
-        // 2. Thư mục phòng ban mà user là OWNER (gốc, parentId = null)
+        // Document ở root level (không thuộc folder nào)
+        documentRepository.findByFolderIdAndIsDeletedFalse(null)
+                .forEach(doc -> tree.add(toDocumentNode(doc)));
+
+        return tree;
+    }
+
+    /**
+     * Lấy cây thư mục PHÒNG BAN: thư mục do user tạo (OWNER) + thư mục được share.
+     */
+    public List<TreeDTO> getDepartmentTree(Long userId) {
+        List<TreeDTO> tree = new ArrayList<>();
+
+        // 1. Thư mục phòng ban mà user là OWNER
         List<Category> ownedDeptRoots = folderRepository
                 .findByOwnerIdAndFolderTypeAndParentIdIsNullAndIsDeletedFalse(userId, FolderType.DEPARTMENT);
         for (Category root : ownedDeptRoots) {
             tree.add(buildTree(root, userId));
         }
 
-        // 3. Thư mục phòng ban mà user được share (tìm folder gốc qua permission)
+        // 2. Thư mục phòng ban mà user được share
         Set<Long> alreadyIncluded = tree.stream()
                 .map(TreeDTO::getId)
                 .collect(Collectors.toSet());
@@ -77,10 +97,6 @@ public class CategoryService {
                 }
             }
         }
-
-        // 4. Document ở root level (không thuộc folder nào)
-        documentRepository.findByFolderIdAndIsDeletedFalse(null)
-                .forEach(doc -> tree.add(toDocumentNode(doc)));
 
         return tree;
     }

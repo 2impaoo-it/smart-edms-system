@@ -38,6 +38,20 @@ public class ManagementController {
         return categoryService.getTree(userId);
     }
 
+    @Operation(summary = "Cây thư mục cá nhân", description = "Trả về cây thư mục cá nhân của user hiện tại")
+    @GetMapping("/tree/personal")
+    public List<TreeDTO> getPersonalTree(@AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return categoryService.getPersonalTree(userId);
+    }
+
+    @Operation(summary = "Cây thư mục phòng ban", description = "Trả về cây thư mục phòng ban mà user có quyền truy cập")
+    @GetMapping("/tree/department")
+    public List<TreeDTO> getDepartmentTree(@AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return categoryService.getDepartmentTree(userId);
+    }
+
     @GetMapping
     public List<Category> getByParentId(@RequestParam(required = false) Long parentId) {
         return categoryService.getByParentId(parentId);
