@@ -6,6 +6,7 @@ import com.smartedms.entity.*;
 import com.smartedms.repository.CategoryRepository;
 import com.smartedms.repository.DocumentRepository;
 import com.smartedms.repository.FolderPermissionRepository;
+import com.smartedms.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,15 +25,18 @@ public class CategoryService {
     private final DocumentRepository documentRepository;
     private final FolderPermissionRepository permissionRepository;
     private final FolderPermissionService permissionService;
+    private final UserRepository userRepository;
 
     public CategoryService(CategoryRepository folderRepository,
                            DocumentRepository documentRepository,
                            FolderPermissionRepository permissionRepository,
-                           FolderPermissionService permissionService) {
+                           FolderPermissionService permissionService,
+                           UserRepository userRepository) {
         this.folderRepository = folderRepository;
         this.documentRepository = documentRepository;
         this.permissionRepository = permissionRepository;
         this.permissionService = permissionService;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -108,7 +112,18 @@ public class CategoryService {
             category.setFolderType(parent.getFolderType());
         } else {
             // Thư mục gốc: lấy folderType từ DTO
-            category.setFolderType(parseFolderType(dto.getFolderType()));
+            FolderType folderType = parseFolderType(dto.getFolderType());
+
+            // Chỉ MANAGER mới được tạo thư mục phòng ban
+            if (folderType == FolderType.DEPARTMENT) {
+                User currentUser = userRepository.findById(userId)
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
+                if (!currentUser.getRoles().contains(Role.ROLE_MANAGER) && !currentUser.getRoles().contains(Role.ROLE_ADMIN)) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ Manager hoặc Admin mới được tạo thư mục phòng ban");
+                }
+            }
+
+            category.setFolderType(folderType);
         }
 
         return folderRepository.save(category);
