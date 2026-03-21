@@ -17,6 +17,13 @@ public class Category {
     @Column(name = "parent_id")
     private Long parentId;
 
+    @Column(name = "owner_id")
+    private Long ownerId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "folder_type", nullable = false)
+    private FolderType folderType = FolderType.PERSONAL;
+
     @Column(name = "is_deleted", nullable = false)
     private boolean isDeleted = false;
 

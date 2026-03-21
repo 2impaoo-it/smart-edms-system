@@ -2,6 +2,7 @@ package com.smartedms.service;
 
 import com.smartedms.entity.Category;
 import com.smartedms.entity.Document;
+import com.smartedms.entity.PermissionLevel;
 import com.smartedms.repository.CategoryRepository;
 import com.smartedms.repository.DocumentRepository;
 import io.minio.BucketExistsArgs;
@@ -37,21 +38,29 @@ public class DocumentService {
     private final DocumentRepository documentRepository;
     private final MinioClient minioClient;
     private final String defaultBucket;
+    private final FolderPermissionService permissionService;
 
     public DocumentService(
             CategoryRepository categoryRepository,
             DocumentRepository documentRepository,
             MinioClient minioClient,
-            @Value("${minio.bucket}") String defaultBucket) {
+            @Value("${minio.bucket}") String defaultBucket,
+            FolderPermissionService permissionService) {
         this.categoryRepository = categoryRepository;
         this.documentRepository = documentRepository;
         this.minioClient = minioClient;
         this.defaultBucket = defaultBucket;
+        this.permissionService = permissionService;
     }
 
-    public Document uploadPdf(MultipartFile file, Long folderId) {
+    public Document uploadPdf(MultipartFile file, Long folderId, Long userId) {
         validatePdf(file);
         validateFolder(folderId);
+
+        // Kiểm tra quyền EDITOR trên thư mục đích
+        if (folderId != null && !permissionService.hasMinimumPermission(userId, folderId, PermissionLevel.EDITOR)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền upload vào thư mục này");
+        }
 
         String originalFileName = file.getOriginalFilename();
         String storedFileName = buildStoredFileName(originalFileName);
@@ -84,10 +93,15 @@ public class DocumentService {
         }
     }
 
-    public ResponseEntity<InputStreamResource> streamPdf(Long id) {
+    public ResponseEntity<InputStreamResource> streamPdf(Long id, Long userId) {
         Document document = documentRepository.findById(id)
                 .filter(existing -> !existing.isDeleted())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+
+        // Kiểm tra quyền VIEWER trên thư mục chứa document
+        if (document.getFolderId() != null && !permissionService.hasMinimumPermission(userId, document.getFolderId(), PermissionLevel.VIEWER)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền xem tài liệu này");
+        }
 
         StorageLocation location = resolveLocation(document.getFilePath());
 
