@@ -9,7 +9,6 @@ import com.smartedms.utils.JwtUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -46,8 +45,7 @@ public class AuthController {
                         @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ")
         })
         @PostMapping("/login")
-        public ResponseEntity<AuthResponse> login(
-                        @RequestBody(description = "Thông tin đăng nhập", required = true) @org.springframework.web.bind.annotation.RequestBody LoginRequest loginRequest) {
+        public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest loginRequest) {
                 // 1. Xác thực User/Pass (Spring Security tự làm bước check DB)
                 Authentication authentication = authenticationManager.authenticate(
                                 new UsernamePasswordAuthenticationToken(
@@ -76,7 +74,7 @@ public class AuthController {
         })
         @PostMapping("/change-password-first-time")
         public ResponseEntity<Map<String, String>> changePasswordFirstTime(
-                        @RequestBody(description = "Mật khẩu hiện tại và mật khẩu mới", required = true) @org.springframework.web.bind.annotation.RequestBody FirstLoginPasswordChangeRequest request) {
+                        @RequestBody FirstLoginPasswordChangeRequest request) {
                 String username = SecurityContextHolder.getContext().getAuthentication().getName();
                 User user = userRepository.findByUsername(username)
                                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
