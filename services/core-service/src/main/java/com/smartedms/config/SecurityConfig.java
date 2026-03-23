@@ -45,6 +45,7 @@ public class SecurityConfig {
                                                                                                               // session
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS).permitAll() // allow CORS preflight
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll() // Cho phép API Login/Register truy cập thoải mái
                         .anyRequest().authenticated() // Còn lại bắt buộc phải đăng nhập
                 )
