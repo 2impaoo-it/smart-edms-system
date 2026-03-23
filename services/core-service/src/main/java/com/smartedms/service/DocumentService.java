@@ -2,9 +2,11 @@ package com.smartedms.service;
 
 import com.smartedms.entity.Category;
 import com.smartedms.entity.Document;
+import com.smartedms.entity.DocumentVersion;
 import com.smartedms.entity.PermissionLevel;
 import com.smartedms.repository.CategoryRepository;
 import com.smartedms.repository.DocumentRepository;
+import com.smartedms.repository.DocumentVersionRepository;
 import io.minio.BucketExistsArgs;
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
@@ -25,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.InputStream;
 import java.time.LocalDate;
@@ -37,6 +40,7 @@ public class DocumentService {
 
     private final CategoryRepository categoryRepository;
     private final DocumentRepository documentRepository;
+    private final DocumentVersionRepository documentVersionRepository;
     private final MinioClient minioClient;
     private final String defaultBucket;
     private final FolderPermissionService permissionService;
@@ -44,11 +48,13 @@ public class DocumentService {
     public DocumentService(
             CategoryRepository categoryRepository,
             DocumentRepository documentRepository,
+            DocumentVersionRepository documentVersionRepository,
             MinioClient minioClient,
             @Value("${minio.bucket}") String defaultBucket,
             FolderPermissionService permissionService) {
         this.categoryRepository = categoryRepository;
         this.documentRepository = documentRepository;
+        this.documentVersionRepository = documentVersionRepository;
         this.minioClient = minioClient;
         this.defaultBucket = defaultBucket;
         this.permissionService = permissionService;
@@ -65,6 +71,7 @@ public class DocumentService {
         documentRepository.save(document);
     }
 
+    @Transactional
     public Document uploadPdf(MultipartFile file, Long folderId, Long userId) {
         validatePdf(file);
         validateFolder(folderId);
@@ -92,9 +99,18 @@ public class DocumentService {
             Document document = new Document();
             document.setName(originalFileName);
             document.setFolderId(folderId);
-            document.setFilePath(defaultBucket + "/" + objectKey);
             document.setDeleted(false);
-            return documentRepository.save(document);
+            document = documentRepository.save(document);
+
+            DocumentVersion version = new DocumentVersion();
+            version.setDocumentId(document.getId());
+            version.setVersionNumber(1);
+            version.setFilePath(defaultBucket + "/" + objectKey);
+            version.setCreatedBy(userId);
+            version.setCurrent(true);
+            documentVersionRepository.save(version);
+
+            return document;
         } catch (MinioException exception) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to upload PDF to MinIO", exception);
         } catch (ResponseStatusException exception) {
@@ -110,12 +126,41 @@ public class DocumentService {
                 .filter(existing -> !existing.isDeleted())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
 
-        // Kiểm tra quyền VIEWER trên thư mục chứa document
         if (document.getFolderId() != null && !permissionService.hasMinimumPermission(userId, document.getFolderId(), PermissionLevel.VIEWER)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền xem tài liệu này");
         }
 
-        StorageLocation location = resolveLocation(document.getFilePath());
+        DocumentVersion currentVersion = documentVersionRepository.findByDocumentIdAndIsCurrentTrue(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document version not found"));
+
+        return streamPdfFromLocation(currentVersion.getFilePath(), document.getName(), document);
+    }
+
+    public ResponseEntity<InputStreamResource> streamPdfVersion(Long documentId, Long versionId, Long userId) {
+        Document document = documentRepository.findById(documentId)
+                .filter(existing -> !existing.isDeleted())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+
+        if (document.getFolderId() != null && !permissionService.hasMinimumPermission(userId, document.getFolderId(), PermissionLevel.VIEWER)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền xem tài liệu này");
+        }
+
+        DocumentVersion version = documentVersionRepository.findById(versionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document version not found"));
+
+        if (!version.getDocumentId().equals(documentId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Version does not belong to this document");
+        }
+
+        return streamPdfFromLocation(version.getFilePath(), document.getName(), document);
+    }
+
+    public List<DocumentVersion> getVersionHistory(Long documentId) {
+        return documentVersionRepository.findByDocumentIdOrderByVersionNumberDesc(documentId);
+    }
+
+    private ResponseEntity<InputStreamResource> streamPdfFromLocation(String filePath, String fileName, Document document) {
+        StorageLocation location = resolveLocation(filePath);
 
         try {
             StatObjectResponse objectStat = minioClient.statObject(
@@ -138,7 +183,7 @@ public class DocumentService {
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_PDF);
-            headers.setContentDisposition(ContentDisposition.inline().filename(document.getName()).build());
+            headers.setContentDisposition(ContentDisposition.inline().filename(fileName).build());
             if (objectStat.size() >= 0) {
                 headers.setContentLength(objectStat.size());
             }

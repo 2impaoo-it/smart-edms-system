@@ -1,6 +1,7 @@
 package com.smartedms.controller;
 
 import com.smartedms.entity.Document;
+import com.smartedms.entity.DocumentVersion;
 import com.smartedms.entity.User;
 import com.smartedms.repository.UserRepository;
 import com.smartedms.service.DocumentService;
@@ -82,6 +83,22 @@ public class DocumentController {
         User user = userRepository.findByUsername(userDetails.getUsername())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
         return user.getId();
+    }
+
+    @GetMapping("/{id}/versions")
+    @Operation(summary = "Lấy lịch sử phiên bản", description = "Trả về danh sách các phiên bản của tài liệu theo thứ tự mới nhất", security = @SecurityRequirement(name = "bearerAuth"))
+    public List<DocumentVersion> getVersions(@PathVariable Long id) {
+        return documentService.getVersionHistory(id);
+    }
+
+    @GetMapping("/{id}/versions/{versionId}/view")
+    @Operation(summary = "Xem PDF của phiên bản cụ thể", description = "Đọc file PDF từ MinIO theo document id và version id.", security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<InputStreamResource> viewVersion(
+            @PathVariable Long id,
+            @PathVariable Long versionId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return documentService.streamPdfVersion(id, versionId, userId);
     }
 
     @DeleteMapping("/{id}")

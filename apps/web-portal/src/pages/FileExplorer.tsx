@@ -25,7 +25,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import type { FileItem, User } from "../lib/types";
 import { cn } from "../lib/utils";
-import { getFolderContents, createFolder, deleteFolder, getFolderTree } from "../services/folderService";
+import { getFolderContents, createFolder, deleteFolder, getPersonalTree, getDepartmentTree } from "../services/folderService";
 import { uploadDocument, getDocumentStreamUrl, getFolderDocuments, deleteDocument } from "../services/documentService";
 
 interface FileExplorerProps {
@@ -33,6 +33,7 @@ interface FileExplorerProps {
     currentFolderId: string | null;
     ownerId?: string | null;
     user?: User | null;
+    folderType: 'PERSONAL' | 'DEPARTMENT';
     onFolderChange: (id: string | null) => void;
 }
 
@@ -81,7 +82,7 @@ const FileSkeleton = ({ viewMode }: { viewMode: 'grid' | 'list' }) => {
     );
 };
 
-export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderChange }: FileExplorerProps) {
+export function FileExplorer({ title, currentFolderId, ownerId, user, folderType, onFolderChange }: FileExplorerProps) {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [isLoading, setIsLoading] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
@@ -130,7 +131,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
             const apiParentId = (currentFolderId === 'root' || currentFolderId === 'dept_root') ? null : currentFolderId;
             
             const [folderRes, documentRes] = await Promise.all([
-                getFolderContents(apiParentId),
+                getFolderContents(apiParentId, folderType),
                 getFolderDocuments(apiParentId)
             ]);
             
@@ -191,7 +192,8 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
                 return;
             }
             try {
-                const res = await getFolderTree();
+                const treeFn = folderType === 'PERSONAL' ? getPersonalTree : getDepartmentTree;
+                const res = await treeFn();
                 const tree = Array.isArray(res.data) ? res.data : [];
                 const path: {id: string, name: string}[] = [];
                 
@@ -274,7 +276,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
         
         try {
             const apiParentId = (currentFolderId === 'root' || currentFolderId === 'dept_root') ? null : currentFolderId;
-            await createFolder({ name: newFolderName, parentId: apiParentId });
+            await createFolder({ name: newFolderName, parentId: apiParentId, folderType });
             toast.success(`Đã tạo thư mục: ${newFolderName}`);
             
             // Re-fetch folders to get the real ID from DB

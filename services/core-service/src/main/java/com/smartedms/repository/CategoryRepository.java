@@ -18,5 +18,9 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     List<Category> findByOwnerIdAndFolderTypeAndParentIdIsNullAndIsDeletedFalse(Long ownerId, FolderType folderType);
 
     List<Category> findByOwnerIdAndIsDeletedFalse(Long ownerId);
+
+    List<Category> findByParentIdAndFolderTypeAndIsDeletedFalse(Long parentId, FolderType folderType);
+
+    List<Category> findByParentIdAndOwnerIdAndFolderTypeAndIsDeletedFalse(Long parentId, Long ownerId, FolderType folderType);
 }
 
