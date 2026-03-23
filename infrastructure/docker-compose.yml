@@ -43,59 +43,12 @@ services:
     networks:
       - smartedms-network
 
-  core-service:
-    build:
-      context: ../services/core-service
-      dockerfile: Dockerfile
-    container_name: smartedms-core-service
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: emds-microservices-gotenberg
     restart: always
-    environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-smartedms}
-      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-postgres}
-      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-smartedms123}
-      - MINIO_ENDPOINT=http://minio:9000
-      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
-      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
     ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
-      - minio
-    networks:
-      - smartedms-network
-
-  audit-service:
-    build:
-      context: ../services/audit-service
-      dockerfile: Dockerfile
-    container_name: smartedms-audit-service
-    restart: always
-    environment:
-      - MONGODB_URI=mongodb://mongodb:27017/smartedms-audit
-      - PORT=3001
-    ports:
-      - "3001:3001"
-    depends_on:
-      - mongodb
-    networks:
-      - smartedms-network
-
-  web-portal:
-    build:
-      context: ../apps/web-portal
-      dockerfile: Dockerfile
-    container_name: smartedms-web-portal
-    restart: always
-    environment:
-      - VITE_BACKEND_URL=http://core-service:8080
-    ports:
-      - "5173:5173"
-    volumes:
-      - ../apps/web-portal:/app
-      - /app/node_modules
-    depends_on:
-      - core-service
-      - audit-service
+      - "3001:3000"
     networks:
       - smartedms-network
 
