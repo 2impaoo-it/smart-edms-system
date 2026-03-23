@@ -24,6 +24,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import type { FileItem, User } from "../lib/types";
 import { cn } from "../lib/utils";
+import { getFolderContents, createFolder, deleteFolder, getFolderTree } from "../services/folderService";
 
 interface FileExplorerProps {
     title: string;
@@ -89,6 +90,40 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
     const [contextMenu, setContextMenu] = useState<{ id: string, x: number, y: number } | null>(null);
     const [viewFileId, setViewFileId] = useState<string | null>(null);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+    const [breadcrumbs, setBreadcrumbs] = useState<{id: string, name: string}[]>([]);
+
+    // Fetch data from API
+    const fetchFilesAndFolders = async () => {
+        setIsLoading(true);
+        try {
+            // Map 'root' or 'dept_root' to null for backend
+            const apiParentId = (currentFolderId === 'root' || currentFolderId === 'dept_root') ? null : currentFolderId;
+            
+            const response = await getFolderContents(apiParentId);
+            // Ensure response data exists
+            const rawData = Array.isArray(response.data) ? response.data : response.data.content || [];
+            
+            // Map Backend Category to Frontend FileItem
+            const mappedData: FileItem[] = rawData.map((cat: any) => ({
+                id: String(cat.id),
+                name: cat.name,
+                type: 'folder', // for now we only get categories from this endpoint
+                size: '--',
+                updatedAt: new Date().toLocaleDateString(), // BE doesn't have updatedAt yet
+                owner: ownerId || user?.id || 'sys', // default owner
+                status: 'draft',
+                parentId: cat.parentId ? String(cat.parentId) : null,
+                isDeleted: cat.isDeleted
+            }));
+
+            setFiles(mappedData);
+        } catch (error) {
+            console.error("Fetch error:", error);
+            toast.error("Không thể tải danh sách tài liệu. Vui lòng kiểm tra kết nối mạng.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     // Click outside to close context menu
     useEffect(() => {
@@ -97,33 +132,51 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
         return () => window.removeEventListener('click', handleClickOutside);
     }, []);
 
-    // Simulate realtime loading when folder changes
+    // Fetch data and build breadcrumbs when folder changes
     useEffect(() => {
-        setIsLoading(true);
-        const timer = setTimeout(() => {
-            setIsLoading(false);
-        }, 600); // 600ms of "Cyber Retrieval" time
-        return () => clearTimeout(timer);
-    }, [currentFolderId]);
+        fetchFilesAndFolders();
+
+        // Build Breadcrumbs from backend tree
+        const buildBreadcrumbs = async () => {
+            if (!currentFolderId || currentFolderId === 'root' || currentFolderId === 'dept_root') {
+                setBreadcrumbs([]);
+                return;
+            }
+            try {
+                const res = await getFolderTree();
+                const tree = Array.isArray(res.data) ? res.data : [];
+                const path: {id: string, name: string}[] = [];
+                
+                const findPath = (nodes: any[], targetId: string, currentPath: any[]): boolean => {
+                    for (const node of nodes) {
+                        const newPath = [...currentPath, { id: String(node.id), name: node.name }];
+                        if (String(node.id) === targetId) {
+                            path.push(...newPath);
+                            return true;
+                        }
+                        if (node.children && node.children.length > 0) {
+                            if (findPath(node.children, targetId, newPath)) return true;
+                        }
+                    }
+                    return false;
+                };
+
+                findPath(tree, currentFolderId, []);
+                setBreadcrumbs(path);
+            } catch (err) {
+                console.error("Failed to get breadcrumbs", err);
+            }
+        };
+
+        buildBreadcrumbs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentFolderId, ownerId, title]);
 
     const currentFiles = useMemo(() => {
         const filtered = files.filter(f => {
             if (f.isDeleted) return false;
-            const matchesParent = f.parentId === currentFolderId;
-            
-            // If viewing personal files
-            if (ownerId) return matchesParent && f.owner === ownerId;
-            
-            // If viewing department files and user is Manager
-            if (user && user.role === 'MANAGER' && title === "Kho phòng ban") {
-                // A manager can only see folders/files that belong to users in their department
-                const fileOwner = ([] as any[]).find(u => u.id === f.owner);
-                if (fileOwner && fileOwner.department !== user.department) {
-                    return false; // Filter out if owner is not in the same department
-                }
-            }
-            
-            return matchesParent;
+            // API now already returns correct filtered data by parentId
+            return true;
         });
 
         // Sort: Folders first, then files
@@ -132,7 +185,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
             if (a.type !== 'folder' && b.type === 'folder') return 1;
             return 0;
         });
-    }, [currentFolderId, ownerId, user, title, files]);
+    }, [files]);
 
     const handleFileClick = (e: React.MouseEvent, file: FileItem) => {
         e.preventDefault();
@@ -167,28 +220,26 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
         setContextMenu({ id: fileId, x, y });
     };
 
-    const handleCreateFolder = (e: React.FormEvent) => {
+    const handleCreateFolder = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newFolderName.trim()) return;
         
-        toast.success(`Đã tạo thư mục: ${newFolderName}`);
-
-        const newFolder: FileItem = {
-            id: `folder_${Date.now()}`,
-            name: newFolderName,
-            type: 'folder',
-            size: '--',
-            updatedAt: new Date().toLocaleDateString(),
-            owner: ownerId || user?.id || 'sys',
-            status: 'draft',
-            parentId: currentFolderId
-        };
-        setFiles([newFolder, ...files]);
-        setShowNewFolderModal(false);
-        setNewFolderName("");
+        try {
+            const apiParentId = (currentFolderId === 'root' || currentFolderId === 'dept_root') ? null : currentFolderId;
+            await createFolder({ name: newFolderName, parentId: apiParentId });
+            toast.success(`Đã tạo thư mục: ${newFolderName}`);
+            
+            // Re-fetch folders to get the real ID from DB
+            fetchFilesAndFolders();
+            
+            setShowNewFolderModal(false);
+            setNewFolderName("");
+        } catch (error: any) {
+            toast.error(error?.response?.data?.message || "Lỗi khi tạo thư mục");
+        }
     };
 
-    const handleMockUpload = (e?: React.ChangeEvent<HTMLInputElement>) => {
+    const handleUpload = (e?: React.ChangeEvent<HTMLInputElement>) => {
         let uploadedFileName = "Tai_Lieu_Moi_Upload.pdf";
         if (e && e.target.files && e.target.files.length > 0) {
             uploadedFileName = e.target.files[0].name;
@@ -208,6 +259,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
         );
         
         uploadTask.then(() => {
+            toast.info("Dữ liệu file tải lên hiện chỉ là Mock UI. Nó sẽ biến mất khi tải lại trang do API chưa hỗ trợ.");
             const fileExt = uploadedFileName.split('.').pop()?.toLowerCase();
             let validExt: 'pdf' | 'docx' | 'xlsx' | 'image' = 'pdf';
             if (fileExt === 'docx') validExt = 'docx';
@@ -228,18 +280,24 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
         });
     };
 
-    const handleDelete = (id: string) => {
-        setFiles(files.map(f => {
-            if (f.id === id) {
-                toast(`Đã chuyển "${f.name}" vào thùng rác`, { icon: '🗑️' });
-                // If it was pending or signed, we might want to log it or notify
-                // But for now, we just mark it as deleted
-                return { ...f, isDeleted: true, deletedAt: new Date().toISOString() };
+    const handleDelete = async (id: string) => {
+        const fileToDelete = files.find(f => f.id === id);
+        
+        try {
+            if (fileToDelete?.type === 'folder') {
+                await deleteFolder(id);
+                toast.success(`Đã chuyển thư mục "${fileToDelete.name}" vào thùng rác`, { icon: '🗑️' });
+                fetchFilesAndFolders();
+            } else {
+                // Mock delete for files since no document API yet
+                toast(`Đã chuyển file "${fileToDelete?.name}" vào thùng rác`, { icon: '🗑️' });
+                setFiles(files.filter(f => f.id !== id));
             }
-            return f;
-        }));
+        } catch (error: any) {
+            toast.error("Lỗi khi xóa: " + (error?.response?.data?.message || "Hệ thống bận"));
+        }
+        
         setContextMenu(null);
-        // Dispatch custom event for notifications if needed, or simply let the app know (mocking)
     };
 
     const handleRecall = (id: string) => {
@@ -261,24 +319,6 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
     };
 
     const fileToView = files.find(f => f.id === viewFileId);
-
-    // Build breadcrumbs optimally with useMemo to prevent unnecessary recalculations
-    const breadcrumbs = useMemo(() => {
-        const crumbs = [];
-        let curr = currentFolderId;
-        const visited = new Set<string>(); // Prevent infinite loops in case of malformed data
-        while (curr && curr !== 'root' && curr !== 'dept_root' && !visited.has(curr)) {
-            visited.add(curr);
-            const f = files.find(x => x.id === curr);
-            if (f) {
-                crumbs.unshift({ id: f.id, name: f.name });
-                curr = f.parentId;
-            } else {
-                break;
-            }
-        }
-        return crumbs;
-    }, [currentFolderId, files]);
 
     return (
         <div 
@@ -392,7 +432,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
                                     key={file.id} 
                                     whileHover={{ y: -8, scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
-                                    onClick={(e) => handleFileClick(e, file)} 
+                                    onDoubleClick={(e) => handleFileClick(e, file)} 
                                     onContextMenu={(e) => handleContextMenu(e, file.id)}
                                     className={cn(
                                         "glass-panel rounded-[32px] group cursor-pointer hover:border-primary/40 transition-all shadow-xl bg-white/40 dark:bg-slate-900/40 relative",
@@ -531,7 +571,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
                                 <input 
                                     type="file" 
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                                    onChange={handleMockUpload} 
+                                    onChange={handleUpload} 
                                     title="Kéo thả hoặc click để chọn file"
                                 />
                                 <div className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300 text-primary">
@@ -540,7 +580,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
                                 <p className="text-sm font-black text-primary mb-2">Click hoặc kéo thả file vào đây</p>
                             </div>
 
-                            <button onClick={() => handleMockUpload()} className="w-full mt-6 py-4 rounded-2xl cyber-gradient text-white font-black text-[10px] uppercase tracking-widest shadow-neon hover:scale-[1.02] transition-transform">
+                            <button onClick={() => handleUpload()} className="w-full mt-6 py-4 rounded-2xl cyber-gradient text-white font-black text-[10px] uppercase tracking-widest shadow-neon hover:scale-[1.02] transition-transform">
                                 Bắt đầu tải lên
                             </button>
                         </motion.div>

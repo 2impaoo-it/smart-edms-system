@@ -6,7 +6,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
 @Schema(description = "Response trả về sau khi đăng nhập thành công")
 public class AuthResponse {
@@ -16,4 +15,19 @@ public class AuthResponse {
 
     @Schema(description = "Loại token", example = "Bearer")
     private String tokenType = "Bearer";
+
+    @Schema(description = "Bắt buộc đổi mật khẩu ngay sau lần đăng nhập này", example = "false")
+    private boolean mustChangePassword;
+
+    public AuthResponse(String token, String tokenType) {
+        this.token = token;
+        this.tokenType = tokenType;
+        this.mustChangePassword = false;
+    }
+
+    public AuthResponse(String token, String tokenType, boolean mustChangePassword) {
+        this.token = token;
+        this.tokenType = tokenType;
+        this.mustChangePassword = mustChangePassword;
+    }
 }
