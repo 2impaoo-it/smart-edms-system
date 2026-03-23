@@ -233,7 +233,6 @@ public class CategoryService {
         dto.setId(document.getId());
         dto.setName(document.getName());
         dto.setType("file");
-        dto.setFilePath(document.getFilePath());
         return dto;
     }
 

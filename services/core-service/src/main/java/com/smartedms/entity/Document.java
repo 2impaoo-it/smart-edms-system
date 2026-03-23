@@ -14,8 +14,6 @@ public class Document {
 
     private String name;
 
-    private String filePath;
-
     @Column(name = "folder_id")
     private Long folderId;
 
