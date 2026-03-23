@@ -101,7 +101,16 @@ public class CategoryService {
         return tree;
     }
 
-    public List<Category> getByParentId(Long parentId) {
+    public List<Category> getByParentId(Long parentId, String folderType, Long ownerId) {
+        // Nếu có folderType filter, lọc theo đó
+        if (folderType != null && !folderType.isBlank()) {
+            FolderType type = parseFolderType(folderType);
+            if (ownerId != null && type == FolderType.PERSONAL) {
+                // Tài liệu cá nhân: chỉ lấy folder do user sở hữu
+                return folderRepository.findByParentIdAndOwnerIdAndFolderTypeAndIsDeletedFalse(parentId, ownerId, type);
+            }
+            return folderRepository.findByParentIdAndFolderTypeAndIsDeletedFalse(parentId, type);
+        }
         return folderRepository.findByParentIdAndIsDeletedFalse(parentId);
     }
 

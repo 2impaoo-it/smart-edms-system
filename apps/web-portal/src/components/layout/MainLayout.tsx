@@ -63,11 +63,11 @@ export function MainLayout() {
     const renderContent = () => {
         if (location.pathname === '/dashboard/files') {
             if (currentRole === 'ADMIN') return <PlaceholderPage title="Dashboard Admin" />;
-            return <FileExplorer title="Tài liệu cá nhân" currentFolderId={currentFolderId} onFolderChange={handleFolderChange} ownerId={currentUser.id} />;
+            return <FileExplorer title="Tài liệu cá nhân" currentFolderId={currentFolderId} onFolderChange={handleFolderChange} ownerId={currentUser.id} folderType="PERSONAL" />;
         }
         
         if (location.pathname === '/dashboard/department') {
-            return <FileExplorer title="Kho phòng ban" currentFolderId={currentFolderId} onFolderChange={handleFolderChange} ownerId={null} user={currentUser} />;
+            return <FileExplorer title="Kho phòng ban" currentFolderId={currentFolderId} onFolderChange={handleFolderChange} ownerId={null} user={currentUser} folderType="DEPARTMENT" />;
         }
 
         if (location.pathname === '/dashboard/recycle-bin') return <PlaceholderPage title="Thùng rác" />;

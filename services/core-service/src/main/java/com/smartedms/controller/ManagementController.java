@@ -53,8 +53,12 @@ public class ManagementController {
     }
 
     @GetMapping
-    public List<Category> getByParentId(@RequestParam(required = false) Long parentId) {
-        return categoryService.getByParentId(parentId);
+    public List<Category> getByParentId(
+            @RequestParam(required = false) Long parentId,
+            @RequestParam(required = false) String folderType,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return categoryService.getByParentId(parentId, folderType, userId);
     }
 
     @Operation(summary = "Tạo thư mục mới", description = "Tạo thư mục mới, gán người tạo là user hiện tại")
