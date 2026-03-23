@@ -42,12 +42,13 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Cho phép React gọi sang
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS).permitAll() // allow CORS preflight
                         .requestMatchers("/api/auth/**").permitAll() // Cho phép API Login/Register truy cập thoải mái
                         .requestMatchers(HttpMethod.POST, "/api/users").hasRole("ADMIN")
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs.yaml")
                         .permitAll() // Swagger UI
-                        .anyRequest().authenticated() // Còn lại bắt buộc phải đăng nhập
+                        .anyRequest().authenticated() // CÃ²n láº¡i báº¯t buá»™c pháº£i Ä‘Äƒng nháº­p     
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

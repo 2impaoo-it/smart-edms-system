@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { gooeyToast as toast } from "goey-toast";
-import { login } from "../services/authService";
+import { login, changePasswordFirstTime } from "../services/authService";
 import {
   Mail,
   Lock,
@@ -38,17 +38,17 @@ export function Login() {
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       const { data } = await login({ email: username, password: password });
-      return data.token;
+      return data;
     };
 
     const promiseInstance = loginPromise();
 
     toast.promise(promiseInstance, {
       loading: "Đang xác thực thông tin...",
-      success: (token) => {
+      success: (data) => {
         try {
           // Decode JWT payload
-          const base64Url = token.split(".")[1];
+          const base64Url = data.token.split(".")[1];
           const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
           const jsonPayload = decodeURIComponent(
             atob(base64)
@@ -66,7 +66,7 @@ export function Login() {
           if (roles.includes("ROLE_ADMIN")) finalRole = "ADMIN";
           else if (roles.includes("ROLE_MANAGER")) finalRole = "MANAGER";
 
-          localStorage.setItem("token", token);
+          localStorage.setItem("token", data.token);
           localStorage.setItem(
             "user",
             JSON.stringify({
@@ -82,11 +82,27 @@ export function Login() {
           console.error(e);
         }
 
+        if (data.mustChangePassword) {
+            setShowPasswordChange(true);
+            return "Yêu cầu đổi mật khẩu. Vui lòng cập nhật mật khẩu mới.";
+        }
+
         setTimeout(() => navigate("/dashboard"), 800);
         return "Đăng nhập thành công! Đang chuyển hướng...";
       },
-      error: (err: any) =>
-        err.message || "Đăng nhập thất bại. Vui lòng thử lại.",
+      error: (err: any) => {
+        const status = err.response?.status;
+        const msg = err.response?.data?.message;
+        
+        if (status === 403 && msg === "Bạn phải đổi mật khẩu ở lần đăng nhập đầu tiên") {
+          setShowPasswordChange(true);
+          return "Tài khoản bảo mật: Yêu cầu cập nhật mật khẩu mới.";
+        }
+        if (status === 401) {
+          return "Sai email hoặc mật khẩu. Vui lòng kiểm tra lại.";
+        }
+        return msg || "Đăng nhập thất bại. Hệ thống không phản hồi.";
+      },
     });
 
     promiseInstance.finally(() => {
@@ -94,7 +110,7 @@ export function Login() {
     });
   };
 
-  const handlePasswordChange = (e: React.FormEvent) => {
+  const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
       toast.error("Mật khẩu xác nhận không khớp.");
@@ -102,21 +118,25 @@ export function Login() {
     }
     setIsLoading(true);
 
-    const changePassPromise = new Promise((resolve) =>
-      setTimeout(resolve, 1500),
-    );
+    try {
+      const changePassPromise = changePasswordFirstTime({
+        currentPassword: password,
+        newPassword: newPassword,
+      });
 
-    toast.promise(changePassPromise, {
-      loading: "Đang cập nhật mật khẩu...",
-      success: "Đổi mật khẩu thành công. Chào mừng bạn!",
-      error: "Lỗi khi đổi mật khẩu",
-    });
+      await toast.promise(changePassPromise, {
+        loading: "Đang cập nhật mật khẩu...",
+        success: "Đổi mật khẩu thành công. Chào mừng bạn!",
+        error: (err: any) => err.response?.data?.message || "Lỗi khi đổi mật khẩu",
+      });
 
-    changePassPromise.finally(() => {
-      setIsLoading(false);
       setShowPasswordChange(false);
       setTimeout(() => navigate("/dashboard"), 1000);
-    });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

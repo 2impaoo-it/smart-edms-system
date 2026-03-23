@@ -4,6 +4,7 @@ import "goey-toast/styles.css";
 
 import { Login } from "./pages/Login";
 import { MainLayout } from "./components/layout/MainLayout";
+import { ProtectedRoute } from "./components/layout/ProtectedRoute";
 // Import các trang cần thiết
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 const router = createBrowserRouter([
@@ -13,48 +14,53 @@ const router = createBrowserRouter([
     },
     {
         path: "/dashboard",
-        element: <MainLayout />,
+        element: <ProtectedRoute />,
         children: [
             {
-                index: true,
-                element: <PlaceholderPage title="Dashboard Tổng quan" />,
-            },
-            {
-                path: "files",
-                element: null, // Dành riêng spotlight cho task EDMS-50
-            },
-            {
-                path: "department",
-                element: <PlaceholderPage title="Quản lý Phòng ban" />,
-            },
-            {
-                path: "recycle-bin",
-                element: <PlaceholderPage title="Thùng rác" />,
-            },
-            {
-                path: "audit-logs",
-                element: <PlaceholderPage title="Nhật ký Hệ thống (Audit Logs)" />,
-            },
-            {
-                path: "approvals",
-                element: <PlaceholderPage title="Quản lý Phê duyệt" />,
-            },
-            {
-                path: "signatures",
-                element: <PlaceholderPage title="Quản lý Chữ ký" />,
-            },
-            {
-                path: "users",
-                element: <PlaceholderPage title="Quản lý Người dùng" />,
-            },
-            {
-                path: "storage",
-                element: <PlaceholderPage title="Quản lý Lưu trữ" />,
-            },
-            {
-                path: "settings",
-                element: <PlaceholderPage title="Cài đặt Hệ thống" />,
-            },
+                element: <MainLayout />,
+                children: [
+                    {
+                        index: true,
+                        element: null, // Routed in MainLayout
+                    },
+                    {
+                        path: "files",
+                        element: null, // Dành riêng spotlight cho task EDMS-50
+                    },
+                    {
+                        path: "department",
+                        element: <PlaceholderPage title="Quản lý Phòng ban" />,
+                    },
+                    {
+                        path: "recycle-bin",
+                        element: <PlaceholderPage title="Thùng rác" />,
+                    },
+                    {
+                        path: "audit-logs",
+                        element: <PlaceholderPage title="Nhật ký Hệ thống (Audit Logs)" />,
+                    },
+                    {
+                        path: "approvals",
+                        element: <PlaceholderPage title="Quản lý Phê duyệt" />,
+                    },
+                    {
+                        path: "signatures",
+                        element: <PlaceholderPage title="Quản lý Chữ ký" />,
+                    },
+                    {
+                        path: "users",
+                        element: <PlaceholderPage title="Quản lý Người dùng" />,
+                    },
+                    {
+                        path: "storage",
+                        element: <PlaceholderPage title="Quản lý Lưu trữ" />,
+                    },
+                    {
+                        path: "settings",
+                        element: <PlaceholderPage title="Cài đặt Hệ thống" />,
+                    },
+                ]
+            }
         ]
     },
     {

@@ -3,6 +3,7 @@ import { Sidebar } from "./Sidebar";
 import type { UserRole } from "../../lib/types";
 import { FileExplorer } from "../../pages/FileExplorer";
 import { PlaceholderPage } from "../../pages/PlaceholderPage";
+import { AdminDashboard, ManagerDashboard, StaffDashboard } from "../../pages/Dashboard";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 
 export interface AppNotification {
@@ -19,10 +20,10 @@ export function MainLayout() {
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // Initialize from localStorage
+    // Lấy thông tin user từ localStorage, đã được kiểm tra ở ProtectedRoute
     const [currentUser] = useState<any>(() => {
         const stored = localStorage.getItem('user');
-        return stored ? JSON.parse(stored) : { id: "1", role: "MANAGER", name: "Mock User", email: "mock@mock.com", department: "IT", avatar: "", status: "active" }; // Fallback for dev mode
+        return stored ? JSON.parse(stored) : null; 
     });
 
     const currentRole: UserRole = currentUser?.role || 'STAFF';
@@ -76,6 +77,12 @@ export function MainLayout() {
         if (location.pathname === '/dashboard/users') return <PlaceholderPage title="Quản lý Người dùng" />;
         if (location.pathname === '/dashboard/storage') return <PlaceholderPage title="Quản lý Lưu trữ" />;
         if (location.pathname === '/dashboard/settings') return <PlaceholderPage title="Cài đặt Hệ thống" />;
+        
+        if (location.pathname === '/dashboard' || location.pathname === '/dashboard/') {
+            if (currentRole === 'ADMIN') return <AdminDashboard user={currentUser} onNavigate={navigate} />;
+            if (currentRole === 'MANAGER') return <ManagerDashboard user={currentUser} onNavigate={navigate} />;
+            return <StaffDashboard user={currentUser} onNavigate={navigate} />;
+        }
         
         return <PlaceholderPage title={`Trang Tổng quan (${currentRole})`} />;
     };

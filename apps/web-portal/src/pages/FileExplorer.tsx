@@ -1,5 +1,6 @@
 
 import { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { gooeyToast as toast } from "goey-toast";
 import { 
     FolderPlus, 
@@ -25,6 +26,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { FileItem, User } from "../lib/types";
 import { cn } from "../lib/utils";
 import { getFolderContents, createFolder, deleteFolder, getFolderTree } from "../services/folderService";
+import { uploadDocument, getDocumentStreamUrl, getFolderDocuments, deleteDocument } from "../services/documentService";
 
 interface FileExplorerProps {
     title: string;
@@ -89,8 +91,36 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
     
     const [contextMenu, setContextMenu] = useState<{ id: string, x: number, y: number } | null>(null);
     const [viewFileId, setViewFileId] = useState<string | null>(null);
+    const [pdfUrl, setPdfUrl] = useState<string | null>(null);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [breadcrumbs, setBreadcrumbs] = useState<{id: string, name: string}[]>([]);
+
+    // Fetch PDF Blob URL when viewing a file
+    useEffect(() => {
+        if (!viewFileId) {
+            setPdfUrl(null);
+            return;
+        }
+
+        let blobUrl: string | null = null;
+        const fetchPdf = async () => {
+            try {
+                const response = await getDocumentStreamUrl(viewFileId);
+                const blob = new Blob([response.data], { type: 'application/pdf' });
+                blobUrl = URL.createObjectURL(blob);
+                setPdfUrl(blobUrl);
+            } catch (error) {
+                console.error("Failed to fetch PDF", error);
+                toast.error("Không thể tải tài liệu hoặc tài liệu không phải là PDF.");
+            }
+        };
+
+        fetchPdf();
+
+        return () => {
+            if (blobUrl) URL.revokeObjectURL(blobUrl);
+        };
+    }, [viewFileId]);
 
     // Fetch data from API
     const fetchFilesAndFolders = async () => {
@@ -99,15 +129,20 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
             // Map 'root' or 'dept_root' to null for backend
             const apiParentId = (currentFolderId === 'root' || currentFolderId === 'dept_root') ? null : currentFolderId;
             
-            const response = await getFolderContents(apiParentId);
+            const [folderRes, documentRes] = await Promise.all([
+                getFolderContents(apiParentId),
+                getFolderDocuments(apiParentId)
+            ]);
+            
             // Ensure response data exists
-            const rawData = Array.isArray(response.data) ? response.data : response.data.content || [];
+            const rawFolders = Array.isArray(folderRes.data) ? folderRes.data : folderRes.data.content || [];
+            const rawDocuments = Array.isArray(documentRes.data) ? documentRes.data : documentRes.data.content || [];
             
             // Map Backend Category to Frontend FileItem
-            const mappedData: FileItem[] = rawData.map((cat: any) => ({
+            const mappedFolders: FileItem[] = rawFolders.map((cat: any) => ({
                 id: String(cat.id),
                 name: cat.name,
-                type: 'folder', // for now we only get categories from this endpoint
+                type: 'folder',
                 size: '--',
                 updatedAt: new Date().toLocaleDateString(), // BE doesn't have updatedAt yet
                 owner: ownerId || user?.id || 'sys', // default owner
@@ -116,7 +151,20 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
                 isDeleted: cat.isDeleted
             }));
 
-            setFiles(mappedData);
+            // Map Backend Document to Frontend FileItem
+            const mappedDocuments: FileItem[] = rawDocuments.map((doc: any) => ({
+                id: String(doc.id),
+                name: doc.name,
+                type: 'file',
+                size: doc.fileSize ? `${(doc.fileSize / 1024).toFixed(1)} KB` : '--',
+                updatedAt: new Date().toLocaleDateString(), // Use actual date if available
+                owner: ownerId || user?.id || 'sys',
+                status: 'draft',
+                parentId: doc.folderId ? String(doc.folderId) : null,
+                isDeleted: doc.isDeleted
+            }));
+
+            setFiles([...mappedFolders, ...mappedDocuments]);
         } catch (error) {
             console.error("Fetch error:", error);
             toast.error("Không thể tải danh sách tài liệu. Vui lòng kiểm tra kết nối mạng.");
@@ -239,45 +287,32 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
         }
     };
 
-    const handleUpload = (e?: React.ChangeEvent<HTMLInputElement>) => {
-        let uploadedFileName = "Tai_Lieu_Moi_Upload.pdf";
-        if (e && e.target.files && e.target.files.length > 0) {
-            uploadedFileName = e.target.files[0].name;
-        }
+    const handleUpload = async (e?: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e || !e.target.files || e.target.files.length === 0) return;
         
+        const file = e.target.files[0];
         setIsUploadModalOpen(false);
 
-        const uploadTask = new Promise((resolve) => setTimeout(resolve, 1500));
-
-        toast.promise(
-            uploadTask, 
-            {
-                loading: `Đang tải lên: ${uploadedFileName}...`,
-                success: `Tải lên thành công!`,
-                error: 'Tải lên thất bại'
-            }
-        );
-        
-        uploadTask.then(() => {
-            toast.info("Dữ liệu file tải lên hiện chỉ là Mock UI. Nó sẽ biến mất khi tải lại trang do API chưa hỗ trợ.");
-            const fileExt = uploadedFileName.split('.').pop()?.toLowerCase();
-            let validExt: 'pdf' | 'docx' | 'xlsx' | 'image' = 'pdf';
-            if (fileExt === 'docx') validExt = 'docx';
-            else if (fileExt === 'xlsx') validExt = 'xlsx';
-            else if (['png', 'jpg', 'jpeg'].includes(fileExt || '')) validExt = 'image';
-
-            const newDoc: FileItem = {
-                id: `doc_${Date.now()}`,
-                name: uploadedFileName,
-                type: validExt,
-                size: '2.5 MB',
-                updatedAt: new Date().toLocaleDateString(),
-                owner: ownerId || user?.id || 'sys',
-                status: 'draft',
-                parentId: currentFolderId
-            };
-            setFiles(prev => [newDoc, ...prev]);
-        });
+        try {
+            const apiParentId = (currentFolderId === 'root' || currentFolderId === 'dept_root') ? null : currentFolderId;
+            
+            const uploadTask = uploadDocument(file, apiParentId);
+            
+            toast.promise(
+                uploadTask, 
+                {
+                    loading: `Đang tải lên: ${file.name}...`,
+                    success: `Tải lên thành công!`,
+                    error: 'Tải lên thất bại. Chỉ hỗ trợ định dạng PDF.'
+                }
+            );
+            
+            uploadTask.then(() => {
+                fetchFilesAndFolders();
+            });
+        } catch (error) {
+            console.error("Upload error", error);
+        }
     };
 
     const handleDelete = async (id: string) => {
@@ -289,9 +324,9 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
                 toast.success(`Đã chuyển thư mục "${fileToDelete.name}" vào thùng rác`, { icon: '🗑️' });
                 fetchFilesAndFolders();
             } else {
-                // Mock delete for files since no document API yet
+                await deleteDocument(id);
                 toast(`Đã chuyển file "${fileToDelete?.name}" vào thùng rác`, { icon: '🗑️' });
-                setFiles(files.filter(f => f.id !== id));
+                fetchFilesAndFolders();
             }
         } catch (error: any) {
             toast.error("Lỗi khi xóa: " + (error?.response?.data?.message || "Hệ thống bận"));
@@ -589,52 +624,50 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, onFolderCh
             </AnimatePresence>
 
             {/* View Document Modal */}
-            <AnimatePresence>
-                {viewFileId && fileToView && (
-                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md">
-                        <motion.div 
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.95, opacity: 0 }}
-                            className="relative w-full max-w-4xl h-[85vh] glass-panel rounded-[40px] overflow-hidden border-white/60 shadow-2xl bg-white flex flex-col"
-                        >
-                            <div className="flex justify-between items-center p-6 border-b border-slate-100 bg-slate-50/50 shrink-0">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-primary/10 text-primary rounded-xl"><FileText className="w-5 h-5" /></div>
-                                    <div>
-                                        <h3 className="font-black text-lg">{fileToView.name}</h3>
-                                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Trạng thái: <span className="text-warning">Chờ xử lý</span></p>
+            {createPortal(
+                <AnimatePresence>
+                    {viewFileId && fileToView && (
+                        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md">
+                            <motion.div
+                                initial={{ scale: 0.95, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.95, opacity: 0 }}
+                                className="relative w-full max-w-5xl h-[90vh] glass-panel rounded-[40px] overflow-hidden border-white/60 shadow-2xl bg-white flex flex-col"
+                            >
+                                <div className="flex justify-between items-center p-6 border-b border-slate-100 bg-slate-50/50 shrink-0">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-primary/10 text-primary rounded-xl"><FileText className="w-5 h-5" /></div>
+                                        <div>
+                                            <h3 className="font-black text-lg">{fileToView.name}</h3>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Trạng thái: <span className="text-warning">Chờ xử lý</span></p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button className="p-3 bg-primary text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                                            <PenTool className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Trình Ký Ngay</span>
+                                        </button>
+                                        <button onClick={() => setViewFileId(null)} className="p-3 hover:bg-slate-200 rounded-xl transition-all bg-slate-100">
+                                            <X className="w-5 h-5 text-slate-600" />
+                                        </button>
                                     </div>
                                 </div>
-                                <div className="flex gap-2">
-                                    <button className="p-3 bg-primary text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
-                                        <PenTool className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Trình Ký Ngay</span>
-                                    </button>
-                                    <button onClick={() => setViewFileId(null)} className="p-3 hover:bg-slate-200 rounded-xl transition-all bg-slate-100">
-                                        <X className="w-5 h-5 text-slate-600" />
-                                    </button>
+                                <div className="flex-1 bg-slate-200/50 flex items-center justify-center p-8 overflow-auto">
+                                    {pdfUrl ? (
+                                        <iframe src={pdfUrl} className="w-full h-full rounded-xl shadow-xl border-0 bg-white" title="PDF Viewer" />
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-2xl shadow-xl min-h-[400px] w-full max-w-2xl">
+                                            <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin mb-6" />
+                                            <h3 className="text-xl font-black mb-2">Đang tải tài liệu...</h3>
+                                            <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Vui lòng chờ giây lát</p>
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-                            <div className="flex-1 bg-slate-200/50 flex items-center justify-center p-8 overflow-auto">
-                                <div className="w-full max-w-2xl bg-white shadow-xl min-h-[800px] p-12 relative animate-in slide-in-from-bottom-8 duration-700">
-                                    <div className="text-center mb-10 border-b pb-6">
-                                        <h1 className="text-2xl font-bold uppercase mb-2">Cộng Hòa Xã Hội Chủ Nghĩa Việt Nam</h1>
-                                        <p className="font-bold underline">Độc lập - Tự do - Hạnh phúc</p>
-                                    </div>
-                                    <h2 className="text-xl font-bold text-center mb-8">{fileToView.name.replace('.pdf', '').replace('.docx', '')}</h2>
-                                    <div className="space-y-4 text-sm leading-relaxed text-justify">
-                                        <p>Đây là bản xem trước nội dung tài liệu. Hệ thống hỗ trợ đọc trực tiếp các định dạng PDF và Office mà không cần tải về máy.</p>
-                                        <div className="h-4 bg-slate-100 rounded w-full mt-8"></div>
-                                        <div className="h-4 bg-slate-100 rounded w-5/6"></div>
-                                        <div className="h-4 bg-slate-100 rounded w-full"></div>
-                                        <div className="h-4 bg-slate-100 rounded w-4/6"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
         </div>
     );
 }

@@ -22,6 +22,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/documents")
 @Tag(name = "Documents", description = "APIs upload và xem trước tài liệu PDF trên MinIO")
@@ -33,6 +35,12 @@ public class DocumentController {
     public DocumentController(DocumentService documentService, UserRepository userRepository) {
         this.documentService = documentService;
         this.userRepository = userRepository;
+    }
+
+    @GetMapping
+    @Operation(summary = "Lấy danh sách các file trong folder", security = @SecurityRequirement(name = "bearerAuth"))
+    public List<Document> getByFolderId(@RequestParam(required = false) Long folderId) {
+        return documentService.getByFolderId(folderId);
     }
 
     @PostMapping(consumes = "multipart/form-data")
@@ -74,5 +82,12 @@ public class DocumentController {
         User user = userRepository.findByUsername(userDetails.getUsername())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
         return user.getId();
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Xóa tài liệu", description = "Xóa mềm (soft delete) tài liệu theo id", security = @SecurityRequirement(name = "bearerAuth"))
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id) {
+        documentService.softDelete(id);
     }
 }
