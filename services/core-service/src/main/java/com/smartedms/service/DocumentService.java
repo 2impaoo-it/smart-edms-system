@@ -44,6 +44,7 @@ public class DocumentService {
     private final MinioClient minioClient;
     private final String defaultBucket;
     private final FolderPermissionService permissionService;
+    private final DocumentConverterService converterService;
 
     public DocumentService(
             CategoryRepository categoryRepository,
@@ -51,13 +52,15 @@ public class DocumentService {
             DocumentVersionRepository documentVersionRepository,
             MinioClient minioClient,
             @Value("${minio.bucket}") String defaultBucket,
-            FolderPermissionService permissionService) {
+            FolderPermissionService permissionService,
+            DocumentConverterService converterService) {
         this.categoryRepository = categoryRepository;
         this.documentRepository = documentRepository;
         this.documentVersionRepository = documentVersionRepository;
         this.minioClient = minioClient;
         this.defaultBucket = defaultBucket;
         this.permissionService = permissionService;
+        this.converterService = converterService;
     }
 
     public List<Document> getByFolderId(Long folderId) {
@@ -73,7 +76,7 @@ public class DocumentService {
 
     @Transactional
     public Document uploadPdf(MultipartFile file, Long folderId, Long userId) {
-        validatePdf(file);
+        validateSupportedFormat(file);
         validateFolder(folderId);
 
         // Kiểm tra quyền EDITOR trên thư mục đích
@@ -81,23 +84,33 @@ public class DocumentService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền upload vào thư mục này");
         }
 
-        String originalFileName = file.getOriginalFilename();
-        String storedFileName = buildStoredFileName(originalFileName);
-        String objectKey = buildObjectKey(folderId, storedFileName);
+        try {
+            byte[] finalFileBytes;
+            String originalFileName = file.getOriginalFilename();
+            String extension = originalFileName.substring(originalFileName.lastIndexOf(".")).toLowerCase();
+            
+            if (extension.equals(".pdf")) {
+                finalFileBytes = file.getBytes();
+            } else {
+                finalFileBytes = converterService.convertToPdf(file);
+            }
+            
+            String safePdfName = getSafePdfName(originalFileName);
+            String storedFileName = buildStoredFileName(safePdfName);
+            String objectKey = buildObjectKey(folderId, storedFileName);
 
-        try (InputStream inputStream = file.getInputStream()) {
             ensureBucketExists(defaultBucket);
 
             minioClient.putObject(
                     PutObjectArgs.builder()
                             .bucket(defaultBucket)
                             .object(objectKey)
-                            .stream(inputStream, file.getSize(), -1)
+                            .stream(new java.io.ByteArrayInputStream(finalFileBytes), finalFileBytes.length, -1)
                             .contentType(MediaType.APPLICATION_PDF_VALUE)
                             .build());
 
             Document document = new Document();
-            document.setName(originalFileName);
+            document.setName(safePdfName);
             document.setFolderId(folderId);
             document.setDeleted(false);
             document = documentRepository.save(document);
@@ -123,7 +136,7 @@ public class DocumentService {
 
     @Transactional
     public DocumentVersion uploadNewVersion(Long documentId, MultipartFile file, Long userId) {
-        validatePdf(file);
+        validateSupportedFormat(file);
         
         Document document = documentRepository.findById(documentId)
                 .filter(existing -> !existing.isDeleted())
@@ -143,17 +156,27 @@ public class DocumentService {
 
         int nextVersion = oldVersions.isEmpty() ? 1 : oldVersions.get(0).getVersionNumber() + 1;
 
-        String originalFileName = file.getOriginalFilename();
-        String storedFileName = buildStoredFileName(originalFileName);
-        String objectKey = buildObjectKey(document.getFolderId(), storedFileName);
+        try {
+            byte[] finalFileBytes;
+            String originalFileName = file.getOriginalFilename();
+            String extension = originalFileName.substring(originalFileName.lastIndexOf(".")).toLowerCase();
+            
+            if (extension.equals(".pdf")) {
+                finalFileBytes = file.getBytes();
+            } else {
+                finalFileBytes = converterService.convertToPdf(file);
+            }
+            
+            String safePdfName = getSafePdfName(originalFileName);
+            String storedFileName = buildStoredFileName(safePdfName);
+            String objectKey = buildObjectKey(document.getFolderId(), storedFileName);
 
-        try (InputStream inputStream = file.getInputStream()) {
             ensureBucketExists(defaultBucket);
             minioClient.putObject(
                     PutObjectArgs.builder()
                             .bucket(defaultBucket)
                             .object(objectKey)
-                            .stream(inputStream, file.getSize(), -1)
+                            .stream(new java.io.ByteArrayInputStream(finalFileBytes), finalFileBytes.length, -1)
                             .contentType(MediaType.APPLICATION_PDF_VALUE)
                             .build());
 
@@ -267,25 +290,30 @@ public class DocumentService {
         }
     }
 
-    private void validatePdf(MultipartFile file) {
+    private void validateSupportedFormat(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "PDF file is required");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tài liệu trống");
         }
 
         String originalFileName = file.getOriginalFilename();
         if (originalFileName == null || originalFileName.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File name is missing");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tên tài liệu trống");
         }
 
         String normalizedFileName = originalFileName.toLowerCase(Locale.ROOT);
-        String contentType = file.getContentType();
-        boolean hasPdfExtension = normalizedFileName.endsWith(".pdf");
-        boolean isPdfContentType = MediaType.APPLICATION_PDF_VALUE.equalsIgnoreCase(contentType);
-
-        if (!hasPdfExtension && !isPdfContentType) {
+        if (!normalizedFileName.matches(".*\\.(pdf|docx|doc|xlsx|xls|pptx|ppt)$")) {
             throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
-                    "Only PDF files are supported");
+                    "Chỉ hỗ trợ PDF hoặc Microsoft Office (Word, Excel, PowerPoint)");
         }
+    }
+
+    private String getSafePdfName(String originalName) {
+        if (originalName == null) return "document.pdf";
+        int lastDotIndex = originalName.lastIndexOf(".");
+        if (lastDotIndex != -1) {
+            return originalName.substring(0, lastDotIndex) + ".pdf";
+        }
+        return originalName + ".pdf";
     }
 
     private void validateFolder(Long folderId) {
