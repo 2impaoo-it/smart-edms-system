@@ -63,6 +63,17 @@ public class DocumentController {
         return documentService.uploadPdf(file, folderId, userId);
     }
 
+    @PostMapping(value = "/{id}/versions", consumes = "multipart/form-data")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Upload phiên bản mới", description = "Tải lên file PDF mới làm phiên bản tiếp theo của tài liệu", security = @SecurityRequirement(name = "bearerAuth"))
+    public DocumentVersion uploadNewVersion(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return documentService.uploadNewVersion(id, file, userId);
+    }
+
     @GetMapping("/{id}/view")
     @Operation(summary = "Lấy luồng PDF để xem trước", description = "Đọc file PDF từ MinIO theo document id và trả về dữ liệu stream.", security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponses({
