@@ -54,6 +54,17 @@ public class DocumentService {
         this.permissionService = permissionService;
     }
 
+    public List<Document> getByFolderId(Long folderId) {
+        return documentRepository.findByFolderIdAndIsDeletedFalse(folderId);
+    }
+
+    public void softDelete(Long id) {
+        Document document = documentRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+        document.setDeleted(true);
+        documentRepository.save(document);
+    }
+
     public Document uploadPdf(MultipartFile file, Long folderId, Long userId) {
         validatePdf(file);
         validateFolder(folderId);
