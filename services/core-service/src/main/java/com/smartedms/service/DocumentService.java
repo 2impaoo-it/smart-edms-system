@@ -121,6 +121,58 @@ public class DocumentService {
         }
     }
 
+    @Transactional
+    public DocumentVersion uploadNewVersion(Long documentId, MultipartFile file, Long userId) {
+        validatePdf(file);
+        
+        Document document = documentRepository.findById(documentId)
+                .filter(existing -> !existing.isDeleted())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+
+        if (document.getFolderId() != null && !permissionService.hasMinimumPermission(userId, document.getFolderId(), PermissionLevel.EDITOR)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền cập nhật tài liệu này");
+        }
+
+        List<DocumentVersion> oldVersions = documentVersionRepository.findByDocumentIdOrderByVersionNumberDesc(documentId);
+        for (DocumentVersion v : oldVersions) {
+            if (v.isCurrent()) {
+                v.setCurrent(false);
+                documentVersionRepository.save(v);
+            }
+        }
+
+        int nextVersion = oldVersions.isEmpty() ? 1 : oldVersions.get(0).getVersionNumber() + 1;
+
+        String originalFileName = file.getOriginalFilename();
+        String storedFileName = buildStoredFileName(originalFileName);
+        String objectKey = buildObjectKey(document.getFolderId(), storedFileName);
+
+        try (InputStream inputStream = file.getInputStream()) {
+            ensureBucketExists(defaultBucket);
+            minioClient.putObject(
+                    PutObjectArgs.builder()
+                            .bucket(defaultBucket)
+                            .object(objectKey)
+                            .stream(inputStream, file.getSize(), -1)
+                            .contentType(MediaType.APPLICATION_PDF_VALUE)
+                            .build());
+
+            DocumentVersion newVersion = new DocumentVersion();
+            newVersion.setDocumentId(document.getId());
+            newVersion.setVersionNumber(nextVersion);
+            newVersion.setFilePath(defaultBucket + "/" + objectKey);
+            newVersion.setCreatedBy(userId);
+            newVersion.setCurrent(true);
+            return documentVersionRepository.save(newVersion);
+        } catch (MinioException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to upload PDF to MinIO", exception);
+        } catch (ResponseStatusException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to upload document version", exception);
+        }
+    }
+
     public ResponseEntity<InputStreamResource> streamPdf(Long id, Long userId) {
         Document document = documentRepository.findById(id)
                 .filter(existing -> !existing.isDeleted())
