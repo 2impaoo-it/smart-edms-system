@@ -20,13 +20,14 @@ import {
     
     Folder,
     ChevronRight,
-    Home
+    Home,
+    Clock
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { FileItem, User } from "../lib/types";
 import { cn } from "../lib/utils";
 import { getFolderContents, createFolder, deleteFolder, getPersonalTree, getDepartmentTree } from "../services/folderService";
-import { uploadDocument, getDocumentStreamUrl, getFolderDocuments, deleteDocument } from "../services/documentService";
+import { uploadDocument, getDocumentStreamUrl, getFolderDocuments, deleteDocument, getDocumentVersions, getDocumentVersionStreamUrl, uploadNewDocumentVersion } from "../services/documentService";
 
 interface FileExplorerProps {
     title: string;
@@ -92,21 +93,30 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
     
     const [contextMenu, setContextMenu] = useState<{ id: string, x: number, y: number } | null>(null);
     const [viewFileId, setViewFileId] = useState<string | null>(null);
+    const [viewFileVersionId, setViewFileVersionId] = useState<string | null>(null);
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [breadcrumbs, setBreadcrumbs] = useState<{id: string, name: string}[]>([]);
+    
+    // History Modal State
+    const [historyFileId, setHistoryFileId] = useState<string | null>(null);
+    const [fileVersions, setFileVersions] = useState<any[]>([]);
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
     // Fetch PDF Blob URL when viewing a file
     useEffect(() => {
         if (!viewFileId) {
             setPdfUrl(null);
+            setViewFileVersionId(null);
             return;
         }
 
         let blobUrl: string | null = null;
         const fetchPdf = async () => {
             try {
-                const response = await getDocumentStreamUrl(viewFileId);
+                const response = viewFileVersionId 
+                    ? await getDocumentVersionStreamUrl(viewFileId, viewFileVersionId)
+                    : await getDocumentStreamUrl(viewFileId);
                 const blob = new Blob([response.data], { type: 'application/pdf' });
                 blobUrl = URL.createObjectURL(blob);
                 setPdfUrl(blobUrl);
@@ -121,7 +131,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
         return () => {
             if (blobUrl) URL.revokeObjectURL(blobUrl);
         };
-    }, [viewFileId]);
+    }, [viewFileId, viewFileVersionId]);
 
     // Fetch data from API
     const fetchFilesAndFolders = async () => {
@@ -348,6 +358,44 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
         setContextMenu(null);
     };
 
+    const handleOpenHistory = async (fileId: string) => {
+        setContextMenu(null);
+        setHistoryFileId(fileId);
+        setIsHistoryLoading(true);
+        try {
+            const res = await getDocumentVersions(fileId);
+            setFileVersions(res.data || []);
+        } catch(e) {
+            console.error(e);
+            toast.error("Lỗi khi tải lịch sử phiên bản.");
+        } finally {
+            setIsHistoryLoading(false);
+        }
+    };
+
+    const handleViewVersion = (fileId: string, versionId: string) => {
+        setHistoryFileId(null);
+        setViewFileId(fileId);
+        setViewFileVersionId(versionId);
+    };
+
+    const handleUpdateVersion = (e: React.ChangeEvent<HTMLInputElement>, fileId: string) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const file = e.target.files[0];
+        
+        const uploadTask = uploadNewDocumentVersion(fileId, file);
+        toast.promise(uploadTask, {
+            loading: `Đang tải lên phiên bản mới...`,
+            success: `Cập nhật phiên bản thành công!`,
+            error: 'Cập nhật thất bại. Vui lòng thử lại.'
+        });
+        
+        uploadTask.then(() => {
+            fetchFilesAndFolders();
+            setContextMenu(null);
+        }).catch(err => console.error(err));
+    };
+
     const getFileIcon = (type: string) => {
         switch(type) {
             case 'folder': return <Folder className="w-10 h-10 text-primary" />;
@@ -465,14 +513,12 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                             viewMode === 'grid' ? "grid-cols-2 md:grid-cols-4 lg:grid-cols-6" : "grid-cols-1"
                         )}>
                             {currentFiles.map(file => (
-                                <motion.div 
+                                <div 
                                     key={file.id} 
-                                    whileHover={{ y: -8, scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
                                     onDoubleClick={(e) => handleFileClick(e, file)} 
                                     onContextMenu={(e) => handleContextMenu(e, file.id)}
                                     className={cn(
-                                        "glass-panel rounded-[32px] group cursor-pointer hover:border-primary/40 transition-all shadow-xl bg-white/40 dark:bg-slate-900/40 relative",
+                                        "glass-panel rounded-[32px] group cursor-pointer transition-all duration-300 hover:-translate-y-2 hover:scale-[1.02] hover:border-primary/40 shadow-xl bg-white/40 dark:bg-slate-900/40 relative",
                                         viewMode === 'grid' ? "p-8 text-center" : "p-4 flex items-center justify-between px-8"
                                     )}
                                 >
@@ -505,7 +551,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                                             <MoreVertical className="w-4 h-4 text-muted-foreground" />
                                         </button>
                                     )}
-                                </motion.div>
+                                </div>
                             ))}
                         </div>
 
@@ -536,6 +582,22 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                             <button className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-primary/10 hover:text-primary rounded-xl transition-colors">
                                 <Download className="w-4 h-4" /> Tải xuống
                             </button>
+                            {contextMenu && files.find(f => f.id === contextMenu.id)?.type !== 'folder' && (
+                                <>
+                                    <label className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-primary/10 hover:text-primary rounded-xl transition-colors cursor-pointer">
+                                        <FileUp className="w-4 h-4" /> Cập nhật bản mới
+                                        <input 
+                                            type="file" 
+                                            className="hidden" 
+                                            accept=".pdf"
+                                            onChange={(e) => handleUpdateVersion(e, contextMenu.id)} 
+                                        />
+                                    </label>
+                                    <button onClick={() => handleOpenHistory(contextMenu.id)} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-primary/10 hover:text-primary rounded-xl transition-colors">
+                                        <Clock className="w-4 h-4" /> Lịch sử phiên bản
+                                    </button>
+                                </>
+                            )}
                             {contextMenu && files.find(f => f.id === contextMenu.id)?.status === 'pending' && (
                                 <button onClick={() => handleRecall(contextMenu.id)} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-warning hover:bg-warning/10 rounded-xl transition-colors">
                                     <ShieldAlert className="w-4 h-4" /> Thu hồi
@@ -620,6 +682,66 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                             <button onClick={() => handleUpload()} className="w-full mt-6 py-4 rounded-2xl cyber-gradient text-white font-black text-[10px] uppercase tracking-widest shadow-neon hover:scale-[1.02] transition-transform">
                                 Bắt đầu tải lên
                             </button>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* History Modal */}
+            <AnimatePresence>
+                {historyFileId && (
+                    <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
+                        <motion.div 
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="relative w-full max-w-2xl glass-panel rounded-[40px] p-8 border-white/60 shadow-2xl bg-white/95 max-h-[80vh] flex flex-col"
+                        >
+                            <button onClick={() => setHistoryFileId(null)} className="absolute top-6 right-6 p-2 hover:bg-slate-100 rounded-xl transition-all">
+                                <X className="w-5 h-5 text-muted-foreground" />
+                            </button>
+                            <h3 className="text-2xl font-black tracking-tighter uppercase italic gradient-text mb-1 flex items-center gap-2">
+                                <Clock className="w-6 h-6" /> Lịch sử phiên bản
+                            </h3>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-6">
+                                Phiên bản tài liệu "{files.find(f => f.id === historyFileId)?.name}"
+                            </p>
+
+                            <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+                                {isHistoryLoading ? (
+                                    <div className="flex justify-center py-10">
+                                        <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+                                    </div>
+                                ) : (
+                                    fileVersions.map((v: any) => (
+                                        <div key={v.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50 flex items-center justify-between hover:border-primary/30 transition-colors">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-black">
+                                                    V{v.versionNumber}
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-sm text-slate-800">
+                                                        Phiên bản {v.versionNumber} 
+                                                        {v.current && <span className="ml-2 inline-block px-2 py-0.5 bg-green-100 text-green-700 text-[10px] uppercase rounded-full">Hiện Tại</span>}
+                                                    </p>
+                                                    <p className="text-xs text-slate-500 mt-1">
+                                                        {new Date(v.createdAt).toLocaleString('vi-VN')}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button 
+                                                onClick={() => handleViewVersion(v.documentId, v.id)}
+                                                className="px-4 py-2 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl text-xs font-bold transition-colors"
+                                            >
+                                                Xem bản này
+                                            </button>
+                                        </div>
+                                    ))
+                                )}
+                                {!isHistoryLoading && fileVersions.length === 0 && (
+                                    <p className="text-center text-sm text-muted-foreground py-10">Không tìm thấy lịch sử phiên bản nào.</p>
+                                )}
+                            </div>
                         </motion.div>
                     </div>
                 )}

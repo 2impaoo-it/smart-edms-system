@@ -21,6 +21,26 @@ export const getDocumentStreamUrl = (id: string) => {
   });
 };
 
+export const getDocumentVersions = (id: string) => {
+  return axiosClient.get(`/documents/${id}/versions`);
+};
+
+export const getDocumentVersionStreamUrl = (id: string, versionId: string) => {
+  return axiosClient.get(`/documents/${id}/versions/${versionId}/view`, {
+    responseType: "blob",
+  });
+};
+
+export const uploadNewDocumentVersion = (documentId: string, file: File) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return axiosClient.post(`/documents/${documentId}/versions`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+};
+
 export const getFolderDocuments = (folderId: string | null) => {
   return axiosClient.get("/documents", { params: { folderId } });
 };
