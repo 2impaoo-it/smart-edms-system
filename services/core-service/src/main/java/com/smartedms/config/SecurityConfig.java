@@ -40,12 +40,10 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable()) // Tắt CSRF vì dùng API Stateless
                 .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Cho phép React gọi sang
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Không
-                                                                                                              // dùng
-                                                                                                              // session
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS).permitAll() // allow CORS preflight
-                        .requestMatchers("/api/auth/login").permitAll()
+                        .requestMatchers("/api/auth/**").permitAll() // Cho phép API Login/Register truy cập thoải mái
                         .requestMatchers(HttpMethod.POST, "/api/users").hasRole("ADMIN")
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs.yaml")
                         .permitAll() // Swagger UI
