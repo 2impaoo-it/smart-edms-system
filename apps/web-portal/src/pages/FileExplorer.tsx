@@ -786,65 +786,68 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
             </AnimatePresence>
 
             {/* Sign Document Modal */}
-            <AnimatePresence>
-                {isSignModalOpen && viewFileId && (
-                    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
-                        <motion.div 
-                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                            className="relative w-full max-w-sm glass-panel rounded-[40px] p-8 border-white/60 shadow-[0_32px_128px_rgba(0,0,0,0.4)] bg-white/95"
-                        >
-                            <button onClick={() => setIsSignModalOpen(false)} className="absolute top-6 right-6 p-2 hover:bg-slate-100 rounded-xl transition-all">
-                                <X className="w-5 h-5 text-muted-foreground" />
-                            </button>
-                            <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-6">
-                                <ShieldAlert className="w-8 h-8" />
-                            </div>
-                            <h3 className="text-xl font-black mb-1">Ký số tài liệu</h3>
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-6 truncate">File: {fileToView?.name}</p>
+            {createPortal(
+                <AnimatePresence>
+                    {isSignModalOpen && viewFileId && (
+                        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
+                            <motion.div 
+                                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                                animate={{ scale: 1, opacity: 1, y: 0 }}
+                                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                                className="relative w-full max-w-sm glass-panel rounded-[40px] p-8 border-white/60 shadow-[0_32px_128px_rgba(0,0,0,0.4)] bg-white/95"
+                            >
+                                <button onClick={() => setIsSignModalOpen(false)} className="absolute top-6 right-6 p-2 hover:bg-slate-100 rounded-xl transition-all">
+                                    <X className="w-5 h-5 text-muted-foreground" />
+                                </button>
+                                <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-6">
+                                    <ShieldAlert className="w-8 h-8" />
+                                </div>
+                                <h3 className="text-xl font-black mb-1">Ký số tài liệu</h3>
+                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-6 truncate">File: {fileToView?.name}</p>
 
-                            <form onSubmit={handleSignSubmit}>
-                                <div className="space-y-4 mb-8">
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-700 block mb-1">File Chứng Thư Số (.p12/.pfx)</label>
-                                        <input 
-                                            type="file" 
-                                            accept=".p12,.pfx,.pem"
-                                            onChange={(e) => setSignP12File(e.target.files ? e.target.files[0] : null)}
-                                            className="w-full text-sm font-medium file:cursor-pointer file:rounded-xl file:border-0 file:bg-primary/10 file:text-primary file:font-black file:py-2 file:px-4 hover:file:bg-primary/20 transition-all"
-                                        />
+                                <form onSubmit={handleSignSubmit}>
+                                    <div className="space-y-4 mb-8">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-700 block mb-1">File Chứng Thư Số (.p12/.pfx)</label>
+                                            <input 
+                                                type="file" 
+                                                accept=".p12,.pfx,.pem"
+                                                onChange={(e) => setSignP12File(e.target.files ? e.target.files[0] : null)}
+                                                className="w-full text-sm font-medium file:cursor-pointer file:rounded-xl file:border-0 file:bg-primary/10 file:text-primary file:font-black file:py-2 file:px-4 hover:file:bg-primary/20 transition-all"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-700 block mb-1">Mật khẩu khóa (Passphrase)</label>
+                                            <input 
+                                                type="password" 
+                                                placeholder="Nhập mật khẩu..." 
+                                                value={signPassword}
+                                                onChange={e => setSignPassword(e.target.value)}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all" 
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-700 block mb-1">Lý do ký</label>
+                                            <input 
+                                                type="text" 
+                                                placeholder="Phê duyệt, Đồng ý..." 
+                                                value={signReason}
+                                                onChange={e => setSignReason(e.target.value)}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all" 
+                                            />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-700 block mb-1">Mật khẩu khóa (Passphrase)</label>
-                                        <input 
-                                            type="password" 
-                                            placeholder="Nhập mật khẩu..." 
-                                            value={signPassword}
-                                            onChange={e => setSignPassword(e.target.value)}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all" 
-                                        />
+                                    <div className="flex gap-3">
+                                        <button type="button" onClick={() => setIsSignModalOpen(false)} className="flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase text-muted-foreground bg-slate-100 hover:bg-slate-200 transition-colors">Hủy</button>
+                                        <button type="submit" disabled={!signP12File || !signPassword.trim()} className="flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase bg-primary text-white shadow-neon hover:scale-[1.02] disabled:opacity-50 transition-all">Khởi tạo Ký</button>
                                     </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-700 block mb-1">Lý do ký</label>
-                                        <input 
-                                            type="text" 
-                                            placeholder="Phê duyệt, Đồng ý..." 
-                                            value={signReason}
-                                            onChange={e => setSignReason(e.target.value)}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all" 
-                                        />
-                                    </div>
-                                </div>
-                                <div className="flex gap-3">
-                                    <button type="button" onClick={() => setIsSignModalOpen(false)} className="flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase text-muted-foreground bg-slate-100 hover:bg-slate-200 transition-colors">Hủy</button>
-                                    <button type="submit" disabled={!signP12File || !signPassword.trim()} className="flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase bg-primary text-white shadow-neon hover:scale-[1.02] disabled:opacity-50 transition-all">Khởi tạo Ký</button>
-                                </div>
-                            </form>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+                                </form>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
 
             {/* View Document Modal */}
             {createPortal(
