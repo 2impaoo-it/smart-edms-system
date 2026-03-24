@@ -5,6 +5,7 @@ import com.smartedms.entity.DocumentVersion;
 import com.smartedms.entity.User;
 import com.smartedms.repository.UserRepository;
 import com.smartedms.service.DocumentService;
+import com.smartedms.service.DocumentSigningService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -31,10 +32,12 @@ import java.util.List;
 public class DocumentController {
 
     private final DocumentService documentService;
+    private final DocumentSigningService documentSigningService;
     private final UserRepository userRepository;
 
-    public DocumentController(DocumentService documentService, UserRepository userRepository) {
+    public DocumentController(DocumentService documentService, DocumentSigningService documentSigningService, UserRepository userRepository) {
         this.documentService = documentService;
+        this.documentSigningService = documentSigningService;
         this.userRepository = userRepository;
     }
 
@@ -117,5 +120,22 @@ public class DocumentController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
         documentService.softDelete(id);
+    }
+
+    @PostMapping(value = "/{id}/sign", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Ký số tài liệu", description = "Đóng dấu chữ ký điện tử lên bản PDF mới nhất và tạo version mới", security = @SecurityRequirement(name = "bearerAuth"))
+    public DocumentVersion signDocument(
+            @PathVariable Long id,
+            @RequestParam("p12File") MultipartFile p12File,
+            @RequestParam("password") String password,
+            @RequestParam(value = "reason", required = false) String reason,
+            @RequestParam(value = "location", required = false) String location,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        try {
+            return documentSigningService.signDocument(id, userId, p12File.getInputStream(), password, reason, location);
+        } catch (java.io.IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File chữ ký không hợp lệ", e);
+        }
     }
 }

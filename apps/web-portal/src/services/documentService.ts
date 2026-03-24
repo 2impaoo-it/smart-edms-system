@@ -48,3 +48,23 @@ export const getFolderDocuments = (folderId: string | null) => {
 export const deleteDocument = (id: string) => {
   return axiosClient.delete(`/documents/${id}`);
 };
+
+export const signDocument = (
+  id: string,
+  p12File: File,
+  password: string,
+  reason?: string,
+  location?: string
+) => {
+  const formData = new FormData();
+  formData.append("p12File", p12File);
+  formData.append("password", password);
+  if (reason) formData.append("reason", reason);
+  if (location) formData.append("location", location);
+
+  return axiosClient.post(`/documents/${id}/sign`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+};

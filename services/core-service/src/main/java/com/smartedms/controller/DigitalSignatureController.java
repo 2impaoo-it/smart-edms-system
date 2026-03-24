@@ -10,6 +10,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import java.security.cert.X509Certificate;
+import java.util.List;
+import com.smartedms.service.PdfSignatureVerificationService;
 
 @RestController
 @RequestMapping("/api/v1/signature")
@@ -18,6 +20,7 @@ import java.security.cert.X509Certificate;
 public class DigitalSignatureController {
 
     private final DigitalSignatureService signatureService;
+    private final PdfSignatureVerificationService verificationService;
 
     @Operation(summary = "Tạo mới cặp khóa RSA và trả về file .p12 (Keystore)")
     @PostMapping("/generate-keystore")
@@ -47,6 +50,18 @@ public class DigitalSignatureController {
                     + cert.getSubjectX500Principal().getName());
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Xác minh keystore thất bại: " + e.getMessage());
+        }
+    }
+
+    @Operation(summary = "Xác minh các chữ ký đính kèm trong file PDF")
+    @PostMapping(value = "/verify-pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<List<PdfSignatureVerificationService.SignatureVerificationResult>> verifyPdf(
+            @RequestPart("pdfFile") MultipartFile pdfFile) {
+        try {
+            List<PdfSignatureVerificationService.SignatureVerificationResult> results = verificationService.verifySignatures(pdfFile.getInputStream());
+            return ResponseEntity.ok(results);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
         }
     }
 }
