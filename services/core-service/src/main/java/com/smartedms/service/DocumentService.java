@@ -75,6 +75,43 @@ public class DocumentService {
     }
 
     @Transactional
+    public Document submitForApproval(Long documentId, Long approverId, Long userId) {
+        Document document = documentRepository.findById(documentId)
+                .filter(existing -> !existing.isDeleted())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+
+        if (document.getStatus() != com.smartedms.entity.DocumentStatus.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ tài liệu DRAFT mới có thể trình ký");
+        }
+
+        if (document.getFolderId() != null && !permissionService.hasMinimumPermission(userId, document.getFolderId(), PermissionLevel.EDITOR)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền trình ký tài liệu này");
+        }
+
+        document.setStatus(com.smartedms.entity.DocumentStatus.PENDING_APPROVAL);
+        document.setApproverId(approverId);
+        return documentRepository.save(document);
+    }
+
+    @Transactional
+    public Document rejectDocument(Long documentId, Long userId) {
+        Document document = documentRepository.findById(documentId)
+                .filter(existing -> !existing.isDeleted())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+
+        if (!userId.equals(document.getApproverId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ người duyệt mới có quyền từ chối");
+        }
+
+        document.setStatus(com.smartedms.entity.DocumentStatus.REJECTED);
+        return documentRepository.save(document);
+    }
+
+    public List<Document> getPendingApprovals(Long approverId) {
+        return documentRepository.findByApproverIdAndStatusAndIsDeletedFalse(approverId, com.smartedms.entity.DocumentStatus.PENDING_APPROVAL);
+    }
+
+    @Transactional
     public Document uploadPdf(MultipartFile file, Long folderId, Long userId) {
         validateSupportedFormat(file);
         validateFolder(folderId);

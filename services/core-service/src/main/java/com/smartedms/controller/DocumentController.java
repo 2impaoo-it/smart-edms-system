@@ -138,4 +138,31 @@ public class DocumentController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File chữ ký không hợp lệ", e);
         }
     }
+
+    @GetMapping("/pending-approvals")
+    @Operation(summary = "Lấy danh sách tài liệu chờ duyệt", description = "Trả về các tài liệu đang ở trạng thái PENDING_APPROVAL do user hiện tại duyệt", security = @SecurityRequirement(name = "bearerAuth"))
+    public List<Document> getPendingApprovals(@AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return documentService.getPendingApprovals(userId);
+    }
+
+    @PutMapping("/{id}/submit-approval")
+    @Operation(summary = "Trình ký tài liệu", description = "Chuyển trạng thái sang PENDING_APPROVAL và chỉ định người duyệt", security = @SecurityRequirement(name = "bearerAuth"))
+    public Document submitForApproval(
+            @PathVariable Long id,
+            @RequestParam Long approverId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return documentService.submitForApproval(id, approverId, userId);
+    }
+
+    @PutMapping("/{id}/reject")
+    @Operation(summary = "Từ chối tài liệu", description = "Chuyển trạng thái sang REJECTED (chỉ dành cho người được chỉ định duyệt)", security = @SecurityRequirement(name = "bearerAuth"))
+    public Document rejectDocument(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return documentService.rejectDocument(id, userId);
+    }
+
 }

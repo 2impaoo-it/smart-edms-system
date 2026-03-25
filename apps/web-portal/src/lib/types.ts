@@ -18,7 +18,7 @@ export interface FileItem {
     owner: string;
     updatedAt: string;
     parentId: string | null;
-    status?: 'draft' | 'pending' | 'signed' | 'rejected';
+    status?: 'DRAFT' | 'PENDING_APPROVAL' | 'SIGNED' | 'REJECTED';
     isDeleted?: boolean;
     deletedAt?: string;
 }

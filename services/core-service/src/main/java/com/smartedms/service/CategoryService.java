@@ -109,9 +109,20 @@ public class CategoryService {
                 // Tài liệu cá nhân: chỉ lấy folder do user sở hữu
                 return folderRepository.findByParentIdAndOwnerIdAndFolderTypeAndIsDeletedFalse(parentId, ownerId, type);
             }
+            if (ownerId != null && type == FolderType.DEPARTMENT) {
+                // Lọc thư mục phòng ban: user là owner HOẶC có quyền truy cập
+                List<Category> allDepts = folderRepository.findByParentIdAndFolderTypeAndIsDeletedFalse(parentId, type);
+                return allDepts.stream()
+                        .filter(cat -> objEquals(cat.getOwnerId(), ownerId) || permissionService.hasPermission(ownerId, cat.getId()))
+                        .collect(Collectors.toList());
+            }
             return folderRepository.findByParentIdAndFolderTypeAndIsDeletedFalse(parentId, type);
         }
         return folderRepository.findByParentIdAndIsDeletedFalse(parentId);
+    }
+
+    private boolean objEquals(Long a, Long b) {
+        return a != null && a.equals(b);
     }
 
     /**

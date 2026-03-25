@@ -7,6 +7,8 @@ import { MainLayout } from "./components/layout/MainLayout";
 import { ProtectedRoute } from "./components/layout/ProtectedRoute";
 // Import các trang cần thiết
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { Settings } from "./pages/Settings";
+import { Approvals } from "./pages/Approvals";
 const router = createBrowserRouter([
     {
         path: "/",
@@ -41,7 +43,7 @@ const router = createBrowserRouter([
                     },
                     {
                         path: "approvals",
-                        element: <PlaceholderPage title="Quản lý Phê duyệt" />,
+                        element: <Approvals />,
                     },
                     {
                         path: "signatures",
@@ -57,7 +59,7 @@ const router = createBrowserRouter([
                     },
                     {
                         path: "settings",
-                        element: <PlaceholderPage title="Cài đặt Hệ thống" />,
+                        element: <Settings />,
                     },
                 ]
             }

@@ -21,13 +21,14 @@ import {
     Folder,
     ChevronRight,
     Home,
-    Clock
+    Clock,
+    Users
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { FileItem, User } from "../lib/types";
 import { cn } from "../lib/utils";
-import { getFolderContents, createFolder, deleteFolder, getPersonalTree, getDepartmentTree } from "../services/folderService";
-import { uploadDocument, getDocumentStreamUrl, getFolderDocuments, deleteDocument, getDocumentVersions, getDocumentVersionStreamUrl, uploadNewDocumentVersion, signDocument } from "../services/documentService";
+import { getFolderContents, createFolder, deleteFolder, getPersonalTree, getDepartmentTree, shareFolder } from "../services/folderService";
+import { uploadDocument, getDocumentStreamUrl, getFolderDocuments, deleteDocument, getDocumentVersions, getDocumentVersionStreamUrl, uploadNewDocumentVersion, signDocument, submitForApproval, rejectDocument } from "../services/documentService";
 
 interface FileExplorerProps {
     title: string;
@@ -109,6 +110,15 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
     const [signReason, setSignReason] = useState("Phê duyệt chuyên môn");
     const [signP12File, setSignP12File] = useState<File | null>(null);
 
+    // Submit Approval Modal State
+    const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+    const [approverId, setApproverId] = useState("");
+
+    // Share Folder Modal State
+    const [shareFolderId, setShareFolderId] = useState<string | null>(null);
+    const [shareUserId, setShareUserId] = useState("");
+    const [shareRole, setShareRole] = useState<'VIEWER'|'EDITOR'>('VIEWER');
+
     // Fetch PDF Blob URL when viewing a file
     useEffect(() => {
         if (!viewFileId) {
@@ -176,7 +186,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                 size: doc.fileSize ? `${(doc.fileSize / 1024).toFixed(1)} KB` : '--',
                 updatedAt: new Date().toLocaleDateString(), // Use actual date if available
                 owner: ownerId || user?.id || 'sys',
-                status: 'draft',
+                status: doc.status || 'DRAFT',
                 parentId: doc.folderId ? String(doc.folderId) : null,
                 isDeleted: doc.isDeleted
             }));
@@ -357,7 +367,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
         setFiles(files.map(f => {
             if (f.id === id) {
                 toast.success(`Đã thu hồi tài liệu "${f.name}"`);
-                return { ...f, status: 'draft' };
+                return { ...f, status: 'DRAFT' };
             }
             return f;
         }));
@@ -431,6 +441,46 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
             setTimeout(() => setViewFileId(oldId), 300);
         } catch (error) {
             console.error("Sign error:", error);
+        }
+    };
+
+    const handleShareSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!shareFolderId || !shareUserId) return;
+        try {
+            await shareFolder(shareFolderId, parseInt(shareUserId), shareRole);
+            toast.success("Chia sẻ thư mục thành công!");
+            setShareFolderId(null);
+            setShareUserId("");
+        } catch (error: any) {
+            toast.error("Lỗi khi chia sẻ: " + (error?.response?.data?.message || "Mã nhân viên không đúng."));
+        }
+    };
+
+    const handleSubmitForApprovalForm = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!viewFileId || !approverId) return;
+        try {
+            await submitForApproval(viewFileId, approverId);
+            toast.success("Trình ký tài liệu thành công!");
+            setIsSubmitModalOpen(false);
+            setApproverId("");
+            fetchFilesAndFolders();
+            setViewFileId(null);
+        } catch (e: any) {
+            toast.error("Lỗi trình ký: " + (e?.response?.data?.message || "Hệ thống bận"));
+        }
+    };
+
+    const handleReject = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        try {
+            await rejectDocument(id);
+            toast.success("Đã từ chối ký tài liệu!");
+            fetchFilesAndFolders();
+            setViewFileId(null);
+        } catch (e: any) {
+            toast.error("Lỗi từ chối: " + (e?.response?.data?.message || "Hệ thống bận"));
         }
     };
 
@@ -620,6 +670,11 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                             <button className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-primary/10 hover:text-primary rounded-xl transition-colors">
                                 <Download className="w-4 h-4" /> Tải xuống
                             </button>
+                            {contextMenu && files.find(f => f.id === contextMenu.id)?.type === 'folder' && folderType === 'DEPARTMENT' && (
+                                <button onClick={() => {setShareFolderId(contextMenu.id); setContextMenu(null);}} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-primary/10 hover:text-primary rounded-xl transition-colors">
+                                    <Users className="w-4 h-4" /> Chia sẻ
+                                </button>
+                            )}
                             {contextMenu && files.find(f => f.id === contextMenu.id)?.type !== 'folder' && (
                                 <>
                                     <label className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-primary/10 hover:text-primary rounded-xl transition-colors cursor-pointer">
@@ -636,7 +691,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                                     </button>
                                 </>
                             )}
-                            {contextMenu && files.find(f => f.id === contextMenu.id)?.status === 'pending' && (
+                            {contextMenu && files.find(f => f.id === contextMenu.id)?.status === 'PENDING_APPROVAL' && (
                                 <button onClick={() => handleRecall(contextMenu.id)} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-warning hover:bg-warning/10 rounded-xl transition-colors">
                                     <ShieldAlert className="w-4 h-4" /> Thu hồi
                                 </button>
@@ -785,6 +840,114 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                 )}
             </AnimatePresence>
 
+            {/* Share Folder Modal */}
+            {createPortal(
+                <AnimatePresence>
+                    {shareFolderId && (
+                        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
+                            <motion.div 
+                                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                                animate={{ scale: 1, opacity: 1, y: 0 }}
+                                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                                className="relative w-full max-w-sm glass-panel rounded-[40px] p-8 border-white/60 shadow-[0_32px_128px_rgba(0,0,0,0.4)] bg-white/95"
+                            >
+                                <button onClick={() => setShareFolderId(null)} className="absolute top-6 right-6 p-2 hover:bg-slate-100 rounded-xl transition-all">
+                                    <X className="w-5 h-5 text-muted-foreground" />
+                                </button>
+                                <div className="w-16 h-16 rounded-2xl bg-indigo-600/10 text-indigo-600 flex items-center justify-center mb-6">
+                                    <Users className="w-8 h-8" />
+                                </div>
+                                <h3 className="text-xl font-black mb-1">Chia sẻ thư mục</h3>
+                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-6">Thêm quyền truy cập cho nhân viên</p>
+
+                                <form onSubmit={handleShareSubmit}>
+                                    <div className="space-y-4 mb-8">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-700 block mb-1">Mã Nhân Viên (User ID)</label>
+                                            <input 
+                                                type="text" 
+                                                placeholder="Ví dụ: 2" 
+                                                value={shareUserId}
+                                                onChange={e => setShareUserId(e.target.value)}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all" 
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-700 block mb-1">Mức Quyền</label>
+                                            <select 
+                                                value={shareRole}
+                                                onChange={e => setShareRole(e.target.value as any)}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer" 
+                                            >
+                                                <option value="VIEWER">VIEWER (Chỉ Xem)</option>
+                                                <option value="EDITOR">EDITOR (Chỉnh Sửa)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <button type="button" onClick={() => setShareFolderId(null)} className="flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase text-muted-foreground bg-slate-100 hover:bg-slate-200 transition-colors">Hủy</button>
+                                        <button type="submit" disabled={!shareUserId.trim()} className="flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase bg-indigo-600 text-white shadow-neon flex items-center gap-2 justify-center hover:scale-[1.02] disabled:opacity-50 transition-all">
+                                            Chia Sẻ
+                                        </button>
+                                    </div>
+                                </form>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
+
+            {/* Submit Approval Modal */}
+            {createPortal(
+                <AnimatePresence>
+                    {isSubmitModalOpen && viewFileId && (
+                        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
+                            <motion.div 
+                                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                                animate={{ scale: 1, opacity: 1, y: 0 }}
+                                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                                className="relative w-full max-w-sm glass-panel rounded-[40px] p-8 border-white/60 shadow-[0_32px_128px_rgba(0,0,0,0.4)] bg-white/95"
+                            >
+                                <button onClick={() => setIsSubmitModalOpen(false)} className="absolute top-6 right-6 p-2 hover:bg-slate-100 rounded-xl transition-all">
+                                    <X className="w-5 h-5 text-muted-foreground" />
+                                </button>
+                                <div className="w-16 h-16 rounded-2xl bg-blue-600/10 text-blue-600 flex items-center justify-center mb-6">
+                                    <ShieldAlert className="w-8 h-8" />
+                                </div>
+                                <h3 className="text-xl font-black mb-1">Trình ký tài liệu</h3>
+                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-6">Chọn người duyệt</p>
+
+                                <form onSubmit={handleSubmitForApprovalForm}>
+                                    <div className="space-y-4 mb-8">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-700 block mb-1">ID Người Duyệt (Manager)</label>
+                                            <input 
+                                                type="text" 
+                                                placeholder="Ví dụ: 2" 
+                                                value={approverId}
+                                                onChange={e => setApproverId(e.target.value)}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all" 
+                                                required
+                                            />
+                                            <p className="text-xs text-muted-foreground mt-2 italic">* Tạm thời nhập ID (vd: 1, 2) theo Database do đồ án chưa cung cấp danh sách Manager.</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <button type="button" onClick={() => setIsSubmitModalOpen(false)} className="flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase text-muted-foreground bg-slate-100 hover:bg-slate-200 transition-colors">Hủy</button>
+                                        <button type="submit" disabled={!approverId.trim()} className="flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase bg-blue-600 text-white shadow-neon flex items-center gap-2 justify-center hover:scale-[1.02] disabled:opacity-50 transition-all">
+                                            <PenTool className="w-4 h-4" /> Gửi
+                                        </button>
+                                    </div>
+                                </form>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
+
             {/* Sign Document Modal */}
             {createPortal(
                 <AnimatePresence>
@@ -865,13 +1028,31 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                                         <div className="p-2 bg-primary/10 text-primary rounded-xl"><FileText className="w-5 h-5" /></div>
                                         <div>
                                             <h3 className="font-black text-lg">{fileToView.name}</h3>
-                                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Trạng thái: <span className="text-warning">Chờ xử lý</span></p>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">
+                                                Trạng thái: 
+                                                {fileToView.status === 'SIGNED' ? <span className="text-green-500 ml-1">Đã Ký Số</span> :
+                                                 fileToView.status === 'PENDING_APPROVAL' ? <span className="text-warning ml-1">Đang chờ duyệt</span> :
+                                                 fileToView.status === 'REJECTED' ? <span className="text-destructive ml-1">Từ chối thao tác</span> :
+                                                 <span className="text-slate-500 ml-1">Nháp (DRAFT)</span>}
+                                            </p>
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
-                                        <button onClick={() => setIsSignModalOpen(true)} className="p-3 bg-primary text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
-                                            <PenTool className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Ký Số Ngay</span>
-                                        </button>
+                                        {user?.role !== 'ADMIN' && fileToView.status === 'DRAFT' && (
+                                            <button onClick={() => setIsSubmitModalOpen(true)} className="p-3 bg-blue-600 text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                                                <PenTool className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Trình Ký</span>
+                                            </button>
+                                        )}
+                                        {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && (fileToView.status === 'DRAFT' || fileToView.status === 'PENDING_APPROVAL') && (
+                                            <button onClick={() => setIsSignModalOpen(true)} className="p-3 bg-primary text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                                                <PenTool className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Ký Số</span>
+                                            </button>
+                                        )}
+                                        {fileToView.status === 'PENDING_APPROVAL' && (user?.role === 'MANAGER' || user?.role === 'ADMIN') && (
+                                            <button onClick={(e) => handleReject(e, fileToView.id)} className="p-3 bg-destructive text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                                                <X className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Từ chối</span>
+                                            </button>
+                                        )}
                                         <button onClick={() => setViewFileId(null)} className="p-3 hover:bg-slate-200 rounded-xl transition-all bg-slate-100">
                                             <X className="w-5 h-5 text-slate-600" />
                                         </button>

@@ -68,3 +68,17 @@ export const signDocument = (
     },
   });
 };
+
+export const submitForApproval = (id: string, approverId: string) => {
+  return axiosClient.put(`/documents/${id}/submit-approval`, null, {
+    params: { approverId },
+  });
+};
+
+export const rejectDocument = (id: string) => {
+  return axiosClient.put(`/documents/${id}/reject`);
+};
+
+export const getPendingApprovals = () => {
+  return axiosClient.get("/documents/pending-approvals");
+};

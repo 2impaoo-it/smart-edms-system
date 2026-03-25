@@ -92,6 +92,8 @@ public class DocumentSigningService {
             newVersion.setCurrent(true);
             
             // 7. Update Document Status (nếu hệ thống có trường status, ở đây dùng name tạm ghi là đã ký hoặc thực tế để Audit Log).
+            document.setStatus(com.smartedms.entity.DocumentStatus.SIGNED);
+            documentRepository.save(document);
             
             return documentVersionRepository.save(newVersion);
         } catch (Exception e) {

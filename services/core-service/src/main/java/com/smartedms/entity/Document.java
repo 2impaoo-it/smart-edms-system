@@ -17,6 +17,13 @@ public class Document {
     @Column(name = "folder_id")
     private Long folderId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private DocumentStatus status = DocumentStatus.DRAFT;
+
+    @Column(name = "approver_id")
+    private Long approverId;
+
     @Column(name = "is_deleted", nullable = false)
     private boolean isDeleted = false;
 
