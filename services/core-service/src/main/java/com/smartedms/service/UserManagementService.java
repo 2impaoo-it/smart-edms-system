@@ -11,7 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -21,13 +23,17 @@ public class UserManagementService {
     private final PasswordEncoder passwordEncoder;
     private final String defaultPassword;
 
+    private final AuditLogPublisherService auditLogPublisherService;
+
     public UserManagementService(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            @Value("${app.user.default-password}") String defaultPassword) {
+            @Value("${app.user.default-password}") String defaultPassword,
+            AuditLogPublisherService auditLogPublisherService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.defaultPassword = defaultPassword;
+        this.auditLogPublisherService = auditLogPublisherService;
     }
 
     @Transactional
@@ -60,7 +66,22 @@ public class UserManagementService {
         user.setMustChangePassword(true);
         user.setRoles(resolveRoles(roleValue));
 
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        String adminUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User adminUser = userRepository.findByUsername(adminUsername).orElse(null);
+        Long adminId = adminUser != null ? adminUser.getId() : null;
+
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorId(adminId)
+                .actorName(adminUsername)
+                .action("CREATE_USER")
+                .entityType("USER")
+                .entityId(savedUser.getId())
+                .details(Map.of("createdUsername", savedUser.getUsername(), "role", roleValue))
+                .build());
+
+        return savedUser;
     }
 
     private Set<Role> resolveRoles(String roleValue) {

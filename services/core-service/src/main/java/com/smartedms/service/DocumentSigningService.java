@@ -28,6 +28,7 @@ public class DocumentSigningService {
     private final String defaultBucket;
     private final DigitalSignatureService digitalSignatureService;
     private final PdfSignatureService pdfSignatureService;
+    private final AuditLogPublisherService auditLogPublisherService;
 
     public DocumentSigningService(
             DocumentRepository documentRepository,
@@ -35,13 +36,15 @@ public class DocumentSigningService {
             MinioClient minioClient,
             @Value("${minio.bucket}") String defaultBucket,
             DigitalSignatureService digitalSignatureService,
-            PdfSignatureService pdfSignatureService) {
+            PdfSignatureService pdfSignatureService,
+            AuditLogPublisherService auditLogPublisherService) {
         this.documentRepository = documentRepository;
         this.documentVersionRepository = documentVersionRepository;
         this.minioClient = minioClient;
         this.defaultBucket = defaultBucket;
         this.digitalSignatureService = digitalSignatureService;
         this.pdfSignatureService = pdfSignatureService;
+        this.auditLogPublisherService = auditLogPublisherService;
     }
 
     @Transactional
@@ -95,6 +98,16 @@ public class DocumentSigningService {
             document.setStatus(com.smartedms.entity.DocumentStatus.SIGNED);
             documentRepository.save(document);
             
+            String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+            auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                    .actorId(userId)
+                    .actorName(username)
+                    .action("DOCUMENT_SIGNED")
+                    .entityType("DOCUMENT")
+                    .entityId(document.getId())
+                    .details(java.util.Map.of("name", document.getName(), "reason", reason))
+                    .build());
+
             return documentVersionRepository.save(newVersion);
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Lỗi khi ký số tài liệu: " + e.getMessage(), e);

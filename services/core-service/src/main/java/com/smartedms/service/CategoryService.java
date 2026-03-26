@@ -26,17 +26,20 @@ public class CategoryService {
     private final FolderPermissionRepository permissionRepository;
     private final FolderPermissionService permissionService;
     private final UserRepository userRepository;
+    private final AuditLogPublisherService auditLogPublisherService;
 
     public CategoryService(CategoryRepository folderRepository,
                            DocumentRepository documentRepository,
                            FolderPermissionRepository permissionRepository,
                            FolderPermissionService permissionService,
-                           UserRepository userRepository) {
+                           UserRepository userRepository,
+                           AuditLogPublisherService auditLogPublisherService) {
         this.folderRepository = folderRepository;
         this.documentRepository = documentRepository;
         this.permissionRepository = permissionRepository;
         this.permissionService = permissionService;
         this.userRepository = userRepository;
+        this.auditLogPublisherService = auditLogPublisherService;
     }
 
     /**
@@ -162,7 +165,19 @@ public class CategoryService {
             category.setFolderType(folderType);
         }
 
-        return folderRepository.save(category);
+        category = folderRepository.save(category);
+
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorId(userId)
+                .actorName(username)
+                .action("CREATE_CATEGORY")
+                .entityType("CATEGORY")
+                .entityId(category.getId())
+                .details(java.util.Map.of("name", category.getName(), "folderType", category.getFolderType().name()))
+                .build());
+
+        return category;
     }
 
     public Category rename(Long id, CategoryRequestDTO dto, Long userId) {
@@ -174,7 +189,19 @@ public class CategoryService {
         }
 
         category.setName(dto.getName());
-        return folderRepository.save(category);
+        category = folderRepository.save(category);
+
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorId(userId)
+                .actorName(username)
+                .action("RENAME_CATEGORY")
+                .entityType("CATEGORY")
+                .entityId(category.getId())
+                .details(java.util.Map.of("newName", category.getName()))
+                .build());
+
+        return category;
     }
 
     @Transactional
@@ -188,6 +215,16 @@ public class CategoryService {
         }
 
         softDeleteRecursive(category);
+
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorId(userId)
+                .actorName(username)
+                .action("DELETE_CATEGORY")
+                .entityType("CATEGORY")
+                .entityId(category.getId())
+                .details(java.util.Map.of("name", category.getName()))
+                .build());
     }
 
     public List<Category> getDeletedCategories(Long userId) {
@@ -207,7 +244,18 @@ public class CategoryService {
         }
 
         category.setDeleted(false);
-        return folderRepository.save(category);
+        category = folderRepository.save(category);
+
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorId(userId)
+                .actorName(username)
+                .action("RESTORE_CATEGORY")
+                .entityType("CATEGORY")
+                .entityId(category.getId())
+                .build());
+
+        return category;
     }
 
     @Transactional
@@ -223,6 +271,15 @@ public class CategoryService {
         }
 
         folderRepository.delete(category);
+
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorId(userId)
+                .actorName(username)
+                .action("HARD_DELETE_CATEGORY")
+                .entityType("CATEGORY")
+                .entityId(category.getId())
+                .build());
     }
 
     /**
