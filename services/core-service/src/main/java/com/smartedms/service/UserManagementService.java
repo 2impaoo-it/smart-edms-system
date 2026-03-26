@@ -55,6 +55,7 @@ public class UserManagementService {
         user.setEmail(email);
         user.setFullName(fullName);
         user.setPhoneNumber(request.getPhoneNumber());
+        user.setJobTitle(request.getJobTitle());
         user.setPassword(passwordEncoder.encode(defaultPassword.trim()));
         user.setMustChangePassword(true);
         user.setRoles(resolveRoles(roleValue));

@@ -165,4 +165,43 @@ public class DocumentController {
         return documentService.rejectDocument(id, userId);
     }
 
+    @PutMapping("/{id}/approve")
+    @Operation(summary = "Phê duyệt tài liệu", description = "Người được chỉ định duyệt tài liệu (chuyển sang APPROVED)", security = @SecurityRequirement(name = "bearerAuth"))
+    public Document approveDocument(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return documentService.approveDocument(id, userId);
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "Tìm kiếm tài liệu", description = "Tìm kiếm tài liệu theo tên, thư mục, trạng thái (có phân trang)", security = @SecurityRequirement(name = "bearerAuth"))
+    public org.springframework.data.domain.Page<Document> searchDocuments(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long folderId,
+            @RequestParam(required = false) com.smartedms.entity.DocumentStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return documentService.searchDocuments(keyword, folderId, status, page, size);
+    }
+
+    @GetMapping("/trash")
+    @Operation(summary = "Danh sách tài liệu đã xóa", description = "Lấy các tài liệu trong thùng rác", security = @SecurityRequirement(name = "bearerAuth"))
+    public List<Document> getDeletedDocuments() {
+        return documentService.getDeletedDocuments();
+    }
+
+    @PutMapping("/{id}/restore")
+    @Operation(summary = "Khôi phục tài liệu", description = "Khôi phục tài liệu từ thùng rác", security = @SecurityRequirement(name = "bearerAuth"))
+    public Document restoreDocument(@PathVariable Long id) {
+        return documentService.restoreDocument(id);
+    }
+
+    @DeleteMapping("/{id}/hard-delete")
+    @Operation(summary = "Xóa vĩnh viễn tài liệu", description = "Xóa vĩnh viễn tài liệu và các file vật lý trên MinIO", security = @SecurityRequirement(name = "bearerAuth"))
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void hardDeleteDocument(@PathVariable Long id) {
+        documentService.hardDeleteDocument(id);
+    }
+
 }

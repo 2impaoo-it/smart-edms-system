@@ -190,6 +190,41 @@ public class CategoryService {
         softDeleteRecursive(category);
     }
 
+    public List<Category> getDeletedCategories(Long userId) {
+        return folderRepository.findByOwnerIdAndIsDeletedTrue(userId);
+    }
+
+    @Transactional
+    public Category restoreCategory(Long id, Long userId) {
+        Category category = folderRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Thư mục không tồn tại: " + id));
+
+        if (!userId.equals(category.getOwnerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ owner mới được khôi phục");
+        }
+        if (!category.isDeleted()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Thư mục không nằm trong thùng rác");
+        }
+
+        category.setDeleted(false);
+        return folderRepository.save(category);
+    }
+
+    @Transactional
+    public void hardDeleteCategory(Long id, Long userId) {
+        Category category = folderRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Thư mục không tồn tại: " + id));
+
+        if (!userId.equals(category.getOwnerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ owner mới được xóa vĩnh viễn");
+        }
+        if (!category.isDeleted()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vui lòng xóa mềm trước khi xóa vĩnh viễn");
+        }
+
+        folderRepository.delete(category);
+    }
+
     /**
      * Tìm folder gốc (parentId = null) của một folder phòng ban bất kỳ.
      */

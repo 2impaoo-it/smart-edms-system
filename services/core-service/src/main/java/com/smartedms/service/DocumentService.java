@@ -75,6 +75,47 @@ public class DocumentService {
     }
 
     @Transactional
+    public Document restoreDocument(Long id) {
+        Document document = documentRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+        if (!document.isDeleted()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tài liệu này không nằm trong thùng rác");
+        }
+        document.setDeleted(false);
+        return documentRepository.save(document);
+    }
+
+    @Transactional
+    public void hardDeleteDocument(Long id) {
+        Document document = documentRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+        
+        List<DocumentVersion> versions = documentVersionRepository.findByDocumentIdOrderByVersionNumberDesc(id);
+        for (DocumentVersion version : versions) {
+            try {
+                StorageLocation location = resolveLocation(version.getFilePath());
+                minioClient.removeObject(io.minio.RemoveObjectArgs.builder()
+                        .bucket(location.bucket())
+                        .object(location.objectKey())
+                        .build());
+            } catch (Exception e) {
+                System.err.println("Failed to delete file from MinIO: " + version.getFilePath());
+            }
+            documentVersionRepository.delete(version);
+        }
+        documentRepository.delete(document);
+    }
+
+    public List<Document> getDeletedDocuments() {
+        return documentRepository.findByIsDeletedTrue();
+    }
+
+    public org.springframework.data.domain.Page<Document> searchDocuments(String keyword, Long folderId, com.smartedms.entity.DocumentStatus status, int page, int size) {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
+        return documentRepository.searchDocuments(keyword, folderId, status, pageable);
+    }
+
+    @Transactional
     public Document submitForApproval(Long documentId, Long approverId, Long userId) {
         Document document = documentRepository.findById(documentId)
                 .filter(existing -> !existing.isDeleted())
@@ -104,6 +145,24 @@ public class DocumentService {
         }
 
         document.setStatus(com.smartedms.entity.DocumentStatus.REJECTED);
+        return documentRepository.save(document);
+    }
+
+    @Transactional
+    public Document approveDocument(Long documentId, Long userId) {
+        Document document = documentRepository.findById(documentId)
+                .filter(existing -> !existing.isDeleted())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+
+        if (!userId.equals(document.getApproverId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ người duyệt mới có quyền phê duyệt");
+        }
+
+        if (document.getStatus() != com.smartedms.entity.DocumentStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tài liệu không ở trạng thái chờ duyệt");
+        }
+
+        document.setStatus(com.smartedms.entity.DocumentStatus.APPROVED);
         return documentRepository.save(document);
     }
 

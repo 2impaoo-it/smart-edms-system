@@ -28,6 +28,7 @@ public class User {
     private String fullName;
     private String email;
     private String phoneNumber;
+    private String jobTitle;
 
     @Column(name = "must_change_password", nullable = false)
     private boolean mustChangePassword = false;
