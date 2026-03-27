@@ -89,6 +89,21 @@ services:
     networks:
       - smartedms-network
 
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: emds-api-ngrok
+    restart: always
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    # Lưu ý cực kỳ quan trọng: Trong Docker Compose, bạn KHÔNG ĐƯỢC để "http 80"
+    # Vì ngrok sẽ lấy cổng 80 của chính cái container ngrok!
+    # Phải gọi "http nginx:80" để ngrok trỏ luồng sang cái container Nginx kế bên.
+    command: "http nginx:80 --url=pseudoeconomical-loise-interpolable.ngrok-free.dev"
+    depends_on:
+      - nginx
+    networks:
+      - smartedms-network
+
 volumes:
   postgres_data:
   minio_data:
