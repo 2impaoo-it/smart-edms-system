@@ -82,3 +82,31 @@ export const rejectDocument = (id: string) => {
 export const getPendingApprovals = () => {
   return axiosClient.get("/documents/pending-approvals");
 };
+
+export interface PageResponse<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+}
+
+// 1. Search Toàn bộ tài liệu (có phân trang)
+export const searchDocuments = (params: { keyword?: string, folderId?: number, status?: string, page?: number, size?: number }) => {
+  return axiosClient.get<PageResponse<any>>("/documents/search", { params });
+};
+
+// 2. Lấy danh sách Trash
+export const getTrashDocuments = () => {
+  return axiosClient.get<any[]>("/documents/trash");
+};
+
+// 3. Phục hồi tài liệu
+export const restoreDocument = (id: string | number) => {
+  return axiosClient.put<any>(`/documents/${id}/restore`);
+};
+
+// 4. Xóa cứng tài liệu
+export const hardDeleteDocument = (id: string | number) => {
+  return axiosClient.delete(`/documents/${id}/hard-delete`);
+};

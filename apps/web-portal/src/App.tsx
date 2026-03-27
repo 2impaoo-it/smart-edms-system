@@ -9,6 +9,7 @@ import { ProtectedRoute } from "./components/layout/ProtectedRoute";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { Settings } from "./pages/Settings";
 import { Approvals } from "./pages/Approvals";
+import { UserManagement } from "./pages/UserManagement";
 const router = createBrowserRouter([
     {
         path: "/",
@@ -51,7 +52,7 @@ const router = createBrowserRouter([
                     },
                     {
                         path: "users",
-                        element: <PlaceholderPage title="Quản lý Người dùng" />,
+                        element: <UserManagement />,
                     },
                     {
                         path: "storage",

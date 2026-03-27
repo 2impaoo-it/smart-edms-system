@@ -4,6 +4,10 @@ import type { UserRole } from "../../lib/types";
 import { FileExplorer } from "../../pages/FileExplorer";
 import { PlaceholderPage } from "../../pages/PlaceholderPage";
 import { AdminDashboard, ManagerDashboard, StaffDashboard } from "../../pages/Dashboard";
+import { UserManagement } from "../../pages/UserManagement";
+import { StorageManagement } from "../../pages/StorageManagement";
+import { SystemLogs } from "../../pages/SystemLogs";
+import { Settings } from "../../pages/Settings";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 
 export interface AppNotification {
@@ -71,12 +75,12 @@ export function MainLayout() {
         }
 
         if (location.pathname === '/dashboard/recycle-bin') return <PlaceholderPage title="Thùng rác" />;
-        if (location.pathname === '/dashboard/audit-logs') return <PlaceholderPage title="Nhật ký Hệ thống" />;
+        if (location.pathname === '/dashboard/audit-logs') return <SystemLogs />;
         if (location.pathname === '/dashboard/approvals') return <PlaceholderPage title="Quản lý Phê duyệt" />;
         if (location.pathname === '/dashboard/signatures') return <PlaceholderPage title="Quản lý Chữ ký" />;
-        if (location.pathname === '/dashboard/users') return <PlaceholderPage title="Quản lý Người dùng" />;
-        if (location.pathname === '/dashboard/storage') return <PlaceholderPage title="Quản lý Lưu trữ" />;
-        if (location.pathname === '/dashboard/settings') return <PlaceholderPage title="Cài đặt Hệ thống" />;
+        if (location.pathname === '/dashboard/users') return <UserManagement />;
+        if (location.pathname === '/dashboard/storage') return <StorageManagement />;
+        if (location.pathname === '/dashboard/settings') return <Settings />;
         
         if (location.pathname === '/dashboard' || location.pathname === '/dashboard/') {
             if (currentRole === 'ADMIN') return <AdminDashboard user={currentUser} onNavigate={navigate} />;

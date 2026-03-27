@@ -61,10 +61,8 @@ export function Sidebar({ role, user, notifications }: SidebarProps) {
         ],
         ADMIN: [
             { name: "Quản lý người dùng", href: "/dashboard/users", icon: Users },
-            { name: "Quản lý chữ ký", href: "/dashboard/signatures", icon: ShieldAlert },
             { name: "Log hệ thống", href: "/dashboard/audit-logs", icon: History },
             { name: "Kho tài liệu tổng", href: "/dashboard/storage", icon: Database },
-            { name: "Cài đặt hệ thống", href: "/dashboard/settings", icon: Settings },
         ]
     };
 

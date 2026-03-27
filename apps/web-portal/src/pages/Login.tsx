@@ -33,95 +33,76 @@ export function Login() {
     e.preventDefault();
     setIsLoading(true);
 
-    const loginPromise = async () => {
-      // Giả lập delay mạng để thấy rõ hiệu ứng morphing của loading -> success
+    const tId = toast("Đang xác thực thông tin...", {
+      description: "Hệ thống đang kiểm tra danh tính của bạn...",
+      duration: 100000
+    });
+
+    try {
       await new Promise((resolve) => setTimeout(resolve, 1500));
       const { data } = await login({ email: username, password: password });
-      return data;
-    };
-
-    const promiseInstance = loginPromise();
-
-    toast.promise(promiseInstance, {
-      loading: "Đang xác thực thông tin...",
-      success: (data) => {
-        if (data.mustChangePassword) return "Yêu cầu đổi mật khẩu";
-        return "Đăng nhập thành công!";
-      },
-      error: (err: any) => {
-        const status = err.response?.status;
-        const msg = err.response?.data?.message;
-        if (status === 403 && msg === "Bạn phải đổi mật khẩu ở lần đăng nhập đầu tiên") return "Tài khoản bảo mật";
-        if (status === 401) return "Đăng nhập thất bại";
-        if (status === 503 || msg?.includes("maintenance") || msg?.includes("bảo trì")) return "Hệ thống bảo trì";
-        return "Lỗi hệ thống";
-      },
-      description: {
-        loading: "Hệ thống đang kiểm tra danh tính của bạn...",
-        success: (data) => {
-          if (data.mustChangePassword) return "Vui lòng cập nhật mật khẩu mới ở lần đăng nhập đầu tiên.";
-          return "Chào mừng bạn quay trở lại Smart EDMS.";
-        },
-        error: (err: any) => {
-          const status = err.response?.status;
-          const msg = err.response?.data?.message;
-          if (status === 403 && msg === "Bạn phải đổi mật khẩu ở lần đăng nhập đầu tiên") return "Yêu cầu cập nhật mật khẩu mới ở lần đầu đăng nhập.";
-          if (status === 401) return "Sai email hoặc mật khẩu. Vui lòng kiểm tra lại.";
-          if (status === 503 || msg?.includes("maintenance") || msg?.includes("bảo trì")) return "Hệ thống đang được nâng cấp, vui lòng thử lại sau.";
-          return msg || "Đăng nhập thất bại. Hệ thống không phản hồi.";
-        }
-      }
-    });
-
-    promiseInstance.then((data) => {
-      try {
-        // Decode JWT payload
-        const base64Url = data.token.split(".")[1];
-        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-        const jsonPayload = decodeURIComponent(
-          atob(base64)
-            .split("")
-            .map(function (c) {
-              return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-            })
-            .join(""),
-        );
-
-        const payload = JSON.parse(jsonPayload);
-        const roles: string[] = payload.roles || [];
-
-        let finalRole = "STAFF";
-        if (roles.includes("ROLE_ADMIN")) finalRole = "ADMIN";
-        else if (roles.includes("ROLE_MANAGER")) finalRole = "MANAGER";
-
-        localStorage.setItem("token", data.token);
-        localStorage.setItem(
-          "user",
-          JSON.stringify({
-            id: payload.sub,
-            name: payload.sub,
-            email: username,
-            role: finalRole,
-            department: "IT",
-            status: "active",
-          }),
-        );
-      } catch (e) {
-        console.error(e);
-      }
 
       if (data.mustChangePassword) {
-        // Cho time nhỏ để báo lỗi, sau đó show modal
+        toast.error("Yêu cầu đổi mật khẩu", { 
+          id: tId, 
+          description: "Vui lòng cập nhật mật khẩu mới ở lần đăng nhập đầu tiên." 
+        });
         setTimeout(() => setShowPasswordChange(true), 500);
       } else {
-        // Tăng delay để user CÓ THỂ NHÌN THẤY TOAST THÀNH CÔNG (morphing)
+        toast.success("Đăng nhập thành công!", { 
+          id: tId, 
+          description: "Chào mừng bạn quay trở lại Smart EDMS." 
+        });
         setTimeout(() => navigate("/dashboard"), 1500);
       }
-    }).catch(() => {
-      // Bỏ qua vì toast đã hiện lỗi
-    }).finally(() => {
+
+      // Decode JWT payload
+      const base64Url = data.token.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map(function (c) {
+            return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+          })
+          .join(""),
+      );
+
+      const payload = JSON.parse(jsonPayload);
+      const roles: string[] = payload.roles || [];
+
+      let finalRole = "STAFF";
+      if (roles.includes("ROLE_ADMIN")) finalRole = "ADMIN";
+      else if (roles.includes("ROLE_MANAGER")) finalRole = "MANAGER";
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          id: payload.sub,
+          name: payload.sub,
+          email: username,
+          role: finalRole,
+          department: "IT",
+          status: "active",
+        }),
+      );
+    } catch (err: any) {
+      const status = err.response?.status;
+      const msg = err.response?.data?.message;
+
+      if (status === 403 && msg === "Bạn phải đổi mật khẩu ở lần đăng nhập đầu tiên") {
+        toast.error("Tài khoản bảo mật", { id: tId, description: "Yêu cầu cập nhật mật khẩu mới ở lần đầu đăng nhập." });
+      } else if (status === 401) {
+        toast.error("Đăng nhập thất bại", { id: tId, description: "Sai email hoặc mật khẩu. Vui lòng kiểm tra lại." });
+      } else if (status === 503 || msg?.includes("maintenance") || msg?.includes("bảo trì")) {
+        toast.error("Hệ thống bảo trì", { id: tId, description: "Hệ thống đang được nâng cấp, vui lòng thử lại sau." });
+      } else {
+        toast.error("Lỗi hệ thống", { id: tId, description: msg || "Đăng nhập thất bại. Hệ thống không phản hồi." });
+      }
+    } finally {
       setIsLoading(false);
-    });
+    }
   };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
@@ -132,30 +113,34 @@ export function Login() {
     }
     setIsLoading(true);
 
-    const promiseInstance = (async () => {
+    const tId = toast("Đang cập nhật mật khẩu...", {
+      description: "Hệ thống đang lưu thay đổi của bạn...",
+      duration: 100000
+    });
+
+    try {
       await new Promise(resolve => setTimeout(resolve, 1200));
-      return changePasswordFirstTime({
+      await changePasswordFirstTime({
         currentPassword: password,
         newPassword: newPassword,
       });
-    })();
 
-    toast.promise(promiseInstance, {
-      loading: "Đang cập nhật mật khẩu...",
-      success: "Đổi mật khẩu thành công!",
-      error: "Đổi mật khẩu thất bại",
-      description: {
-        loading: "Hệ thống đang lưu thay đổi của bạn...",
-        success: "Chào mừng bạn đến với hệ thống Smart EDMS.",
-        error: (err: any) => err.response?.data?.message || "Lỗi không xác định khi đổi mật khẩu."
-      }
-    });
+      toast.success("Đổi mật khẩu thành công!", { 
+        id: tId, 
+        description: "Chào mừng bạn đến với hệ thống Smart EDMS."
+      });
 
-    promiseInstance.then(() => {
       setShowPasswordChange(false);
       setTimeout(() => navigate("/dashboard"), 1500);
-    }).catch((e) => console.error("Update password err:", e))
-      .finally(() => setIsLoading(false));
+    } catch (err: any) {
+      toast.error("Đổi mật khẩu thất bại", {
+        id: tId,
+        description: err.response?.data?.message || "Lỗi không xác định khi đổi mật khẩu."
+      });
+      console.error("Update password err:", err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
