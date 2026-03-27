@@ -1,6 +1,7 @@
 package com.smartedms.controller;
 
 import com.smartedms.service.DigitalSignatureService;
+import com.smartedms.service.UserManagementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +10,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import java.security.cert.X509Certificate;
 import java.util.List;
 import com.smartedms.service.PdfSignatureVerificationService;
@@ -21,14 +24,19 @@ public class DigitalSignatureController {
 
     private final DigitalSignatureService signatureService;
     private final PdfSignatureVerificationService verificationService;
+    private final UserManagementService userManagementService;
 
     @Operation(summary = "Tạo mới cặp khóa RSA và trả về file .p12 (Keystore)")
     @PostMapping("/generate-keystore")
     public ResponseEntity<byte[]> generateKeyStore(
             @RequestParam String commonName,
-            @RequestParam String password) {
+            @RequestParam String password,
+            @AuthenticationPrincipal UserDetails userDetails) {
         try {
             byte[] p12Bytes = signatureService.generateKeyStore(commonName, password);
+            if (userDetails != null) {
+                userManagementService.updateKeystoreStatusByUsername(userDetails.getUsername(), true);
+            }
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"keystore.p12\"")
                     .contentType(MediaType.APPLICATION_OCTET_STREAM)

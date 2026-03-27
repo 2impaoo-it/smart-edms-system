@@ -78,7 +78,7 @@ mongoose.connect(MONGO_URI)
   .catch(err => console.error('MongoDB connection error:', err));
 
 // Import và chạy Kafka Consumer
-const runKafkaConsumer = require('./kafkaConsumer');
+const { runKafkaConsumer } = require('./kafkaConsumer');
 runKafkaConsumer();
 
 server.listen(PORT, () => {

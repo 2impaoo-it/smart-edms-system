@@ -11,9 +11,10 @@ const kafka = new Kafka({
 const admin = kafka.admin();
 const consumer = kafka.consumer({ groupId: 'audit-group' });
 
+let isConnected = false;
+
 const runKafkaConsumer = async () => {
   try {
-    // 1. Khởi tạo Kênh (Topic) tự động nếu chưa có mặt trên Server
     await admin.connect();
     const existingTopics = await admin.listTopics();
     if (!existingTopics.includes('smartedms.audit.logs')) {
@@ -24,11 +25,18 @@ const runKafkaConsumer = async () => {
     }
     await admin.disconnect();
 
-    // 2. Khởi động người nghe (Consumer)
     await consumer.connect();
+    isConnected = true;
     
-    // Subscribe to topic
     await consumer.subscribe({ topic: 'smartedms.audit.logs', fromBeginning: false });
+
+    // Handle disconnects
+    consumer.on(consumer.events.DISCONNECT, () => {
+      isConnected = false;
+    });
+    consumer.on(consumer.events.CONNECT, () => {
+      isConnected = true;
+    });
 
     await consumer.run({
       eachMessage: async ({ topic, partition, message }) => {
@@ -38,9 +46,6 @@ const runKafkaConsumer = async () => {
           
           await AuditLog.create(logData);
           console.log(`[Kafka Consumer] ✅ Lưu MongoDB thành công!`);
-
-          // Nếu thiết kế Global IO cho WebSocket
-          // io.emit('new_audit_log', logData);
         } catch (err) {
           console.error('[Kafka Consumer] Lỗi khi Decode/Lưu message:', err);
         }
@@ -49,8 +54,9 @@ const runKafkaConsumer = async () => {
     
     console.log('[Kafka Consumer] 🚀 Đã kết nối Kafka thành công và đang lắng nghe...');
   } catch (error) {
+    isConnected = false;
     console.error('[Kafka Consumer] ❌ Lỗi khởi tạo Kafka:', error);
   }
 };
 
-module.exports = runKafkaConsumer;
+module.exports = { runKafkaConsumer, isKafkaConnected: () => isConnected };

@@ -15,6 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.List;
 
 @Service
 public class UserManagementService {
@@ -103,5 +104,53 @@ public class UserManagementService {
 
     private String normalize(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    public List<User> getAllUsers() {
+        return userRepository.findAll();
+    }
+
+    public List<User> getManagers() {
+        return userRepository.findByRole(Role.ROLE_MANAGER);
+    }
+
+    @Transactional
+    public void resetKeystoreStatus(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        user.setHasKeystore(false);
+        userRepository.save(user);
+
+        String adminUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorName(adminUsername)
+                .action("RESET_KEYSTORE")
+                .entityType("USER")
+                .entityId(user.getId())
+                .build());
+    }
+
+    @Transactional
+    public void updateUserStatus(Long userId, boolean isActive) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        user.setActive(isActive);
+        userRepository.save(user);
+
+        String adminUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorName(adminUsername)
+                .action(isActive ? "UNBAN_USER" : "BAN_USER")
+                .entityType("USER")
+                .entityId(user.getId())
+                .build());
+    }
+
+    @Transactional
+    public void updateKeystoreStatusByUsername(String username, boolean hasKeystore) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        user.setHasKeystore(hasKeystore);
+        userRepository.save(user);
     }
 }

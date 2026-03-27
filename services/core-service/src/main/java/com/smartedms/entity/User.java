@@ -33,6 +33,12 @@ public class User {
     @Column(name = "must_change_password", nullable = false)
     private boolean mustChangePassword = false;
 
+    @Column(name = "has_keystore", nullable = false)
+    private boolean hasKeystore = false;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @Enumerated(EnumType.STRING)
     @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))
@@ -45,5 +51,7 @@ public class User {
         this.roles = new HashSet<>();
         this.roles.add(Role.ROLE_USER); // Mặc định ROLE_USER
         this.mustChangePassword = true;
+        this.isActive = true;
+        this.hasKeystore = false;
     }
 }

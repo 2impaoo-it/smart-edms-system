@@ -16,6 +16,8 @@ import io.minio.StatObjectResponse;
 import io.minio.MakeBucketArgs;
 import io.minio.errors.ErrorResponseException;
 import io.minio.errors.MinioException;
+import io.minio.messages.Item;
+import io.minio.Result;
 import io.minio.GetObjectResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
@@ -130,6 +132,36 @@ public class DocumentService {
 
     public List<Document> getDeletedDocuments() {
         return documentRepository.findByIsDeletedTrue();
+    }
+
+    @Transactional
+    public void emptyAllTrash() {
+        List<Document> deletedDocs = documentRepository.findByIsDeletedTrue();
+        for (Document doc : deletedDocs) {
+            hardDeleteDocument(doc.getId());
+        }
+
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorName(username)
+                .action("EMPTY_ALL_TRASH")
+                .entityType("SYSTEM")
+                .entityId(0L)
+                .build());
+    }
+
+    public long getSystemStorageUsage() {
+        long totalSize = 0;
+        try {
+            Iterable<Result<Item>> results = minioClient.listObjects(
+                    io.minio.ListObjectsArgs.builder().bucket(defaultBucket).recursive(true).build());
+            for (Result<Item> result : results) {
+                totalSize += result.get().size();
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to get MinIO storage usage: " + e.getMessage());
+        }
+        return totalSize;
     }
 
     public org.springframework.data.domain.Page<Document> searchDocuments(String keyword, Long folderId, com.smartedms.entity.DocumentStatus status, int page, int size) {
