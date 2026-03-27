@@ -33,107 +33,113 @@ export function Login() {
     e.preventDefault();
     setIsLoading(true);
 
-    const loginPromise = async () => {
-      // Giả lập delay mạng để thấy rõ hiệu ứng morphing
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+    const tId = toast("Đang xác thực thông tin...", {
+      description: "Hệ thống đang kiểm tra danh tính của bạn...",
+      duration: 100000
+    });
 
+    try {
       const { data } = await login({ email: username, password: password });
-      return data;
-    };
 
-    const promiseInstance = loginPromise();
+      // Dismiss loading toast trước
+      toast.dismiss(tId);
 
-    toast.promise(promiseInstance, {
-      loading: "Đang xác thực thông tin...",
-      success: (data) => {
-        try {
-          // Decode JWT payload
-          const base64Url = data.token.split(".")[1];
-          const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-          const jsonPayload = decodeURIComponent(
-            atob(base64)
-              .split("")
-              .map(function (c) {
-                return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-              })
-              .join(""),
-          );
+      if (data.mustChangePassword) {
+        toast.error("Yêu cầu đổi mật khẩu", { 
+          description: "Vui lòng cập nhật mật khẩu mới ở lần đăng nhập đầu tiên." 
+        });
+        setTimeout(() => setShowPasswordChange(true), 500);
+      } else {
+        toast.success("Đăng nhập thành công!", { 
+          description: "Chào mừng bạn quay trở lại Smart EDMS." 
+        });
+        setTimeout(() => navigate("/dashboard"), 1500);
+      }
 
-          const payload = JSON.parse(jsonPayload);
-          const roles: string[] = payload.roles || [];
+      // Decode JWT payload
+      const base64Url = data.token.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map(function (c) {
+            return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+          })
+          .join(""),
+      );
 
-          let finalRole = "STAFF";
-          if (roles.includes("ROLE_ADMIN")) finalRole = "ADMIN";
-          else if (roles.includes("ROLE_MANAGER")) finalRole = "MANAGER";
+      const payload = JSON.parse(jsonPayload);
+      const roles: string[] = payload.roles || [];
 
-          localStorage.setItem("token", data.token);
-          localStorage.setItem(
-            "user",
-            JSON.stringify({
-              id: payload.sub,
-              name: payload.sub,
-              email: username,
-              role: finalRole,
-              department: "IT",
-              status: "active",
-            }),
-          );
-        } catch (e) {
-          console.error(e);
-        }
+      let finalRole = "STAFF";
+      if (roles.includes("ROLE_ADMIN")) finalRole = "ADMIN";
+      else if (roles.includes("ROLE_MANAGER")) finalRole = "MANAGER";
 
-        if (data.mustChangePassword) {
-            setShowPasswordChange(true);
-            return "Yêu cầu đổi mật khẩu. Vui lòng cập nhật mật khẩu mới.";
-        }
+      localStorage.setItem("token", data.token);
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          id: payload.sub,
+          name: payload.sub,
+          email: username,
+          role: finalRole,
+          department: "IT",
+          status: "active",
+        }),
+      );
+    } catch (err: any) {
+      // Dismiss loading toast trước
+      toast.dismiss(tId);
 
-        setTimeout(() => navigate("/dashboard"), 800);
-        return "Đăng nhập thành công! Đang chuyển hướng...";
-      },
-      error: (err: any) => {
-        const status = err.response?.status;
-        const msg = err.response?.data?.message;
-        
-        if (status === 403 && msg === "Bạn phải đổi mật khẩu ở lần đăng nhập đầu tiên") {
-          setShowPasswordChange(true);
-          return "Tài khoản bảo mật: Yêu cầu cập nhật mật khẩu mới.";
-        }
-        if (status === 401) {
-          return "Sai email hoặc mật khẩu. Vui lòng kiểm tra lại.";
-        }
-        return msg || "Đăng nhập thất bại. Hệ thống không phản hồi.";
-      },
-    });
+      const status = err.response?.status;
+      const msg = err.response?.data?.message;
 
-    promiseInstance.finally(() => {
+      if (status === 403 && msg === "Bạn phải đổi mật khẩu ở lần đăng nhập đầu tiên") {
+        toast.error("Tài khoản bảo mật", { description: "Yêu cầu cập nhật mật khẩu mới ở lần đầu đăng nhập." });
+      } else if (status === 401) {
+        toast.error("Đăng nhập thất bại", { description: "Sai email hoặc mật khẩu. Vui lòng kiểm tra lại." });
+      } else if (status === 503 || msg?.includes("maintenance") || msg?.includes("bảo trì")) {
+        toast.error("Hệ thống bảo trì", { description: "Hệ thống đang được nâng cấp, vui lòng thử lại sau." });
+      } else {
+        toast.error("Lỗi hệ thống", { description: msg || "Đăng nhập thất bại. Hệ thống không phản hồi." });
+      }
+    } finally {
       setIsLoading(false);
-    });
+    }
   };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      toast.error("Mật khẩu xác nhận không khớp.");
+      toast.error("Mật khẩu không khớp", { description: "Mật khẩu xác nhận không giống với mật khẩu mới." });
       return;
     }
     setIsLoading(true);
 
+    const tId = toast("Đang cập nhật mật khẩu...", {
+      description: "Hệ thống đang lưu thay đổi của bạn...",
+      duration: 100000
+    });
+
     try {
-      const changePassPromise = changePasswordFirstTime({
+      await changePasswordFirstTime({
         currentPassword: password,
         newPassword: newPassword,
       });
 
-      await toast.promise(changePassPromise, {
-        loading: "Đang cập nhật mật khẩu...",
-        success: "Đổi mật khẩu thành công. Chào mừng bạn!",
-        error: (err: any) => err.response?.data?.message || "Lỗi khi đổi mật khẩu",
+      toast.dismiss(tId);
+      toast.success("Đổi mật khẩu thành công!", { 
+        description: "Chào mừng bạn đến với hệ thống Smart EDMS."
       });
 
       setShowPasswordChange(false);
-      setTimeout(() => navigate("/dashboard"), 1000);
-    } catch (error) {
-      console.error(error);
+      setTimeout(() => navigate("/dashboard"), 1500);
+    } catch (err: any) {
+      toast.dismiss(tId);
+      toast.error("Đổi mật khẩu thất bại", {
+        description: err.response?.data?.message || "Lỗi không xác định khi đổi mật khẩu."
+      });
+      console.error("Update password err:", err);
     } finally {
       setIsLoading(false);
     }

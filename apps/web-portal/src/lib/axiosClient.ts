@@ -1,9 +1,10 @@
 import axios from "axios";
 
 const axiosClient = axios.create({
-  baseURL: "/api",
+  baseURL: "https://pseudoeconomical-loise-interpolable.ngrok-free.dev/api",
   headers: {
     "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true",
   },
 });
 
@@ -22,14 +23,20 @@ axiosClient.interceptors.request.use(
 
 // ── Response Interceptor ─────────────────────────────────────────────────────
 // Xử lý lỗi 401 hoặc 403 do bắt buộc đổi mật khẩu: xóa token và đẩy về trang Login
+// CHÚ Ý: Không auto-logout với các service phụ (audit, feed) vì chúng có auth riêng
 axiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 || (error.response?.status === 403 && error.response?.data?.message === "Bạn phải đổi mật khẩu ở lần đăng nhập đầu tiên")) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      if (window.location.pathname !== "/") {
-        window.location.href = "/";
+    const requestUrl = error.config?.url || "";
+    const isAuxiliaryService = requestUrl.includes("/audit") || requestUrl.includes("/feed");
+
+    if (!isAuxiliaryService) {
+      if (error.response?.status === 401 || (error.response?.status === 403 && error.response?.data?.message === "Bạn phải đổi mật khẩu ở lần đăng nhập đầu tiên")) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        if (window.location.pathname !== "/") {
+          window.location.href = "/";
+        }
       }
     }
     return Promise.reject(error);

@@ -9,6 +9,7 @@ import { ProtectedRoute } from "./components/layout/ProtectedRoute";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { Settings } from "./pages/Settings";
 import { Approvals } from "./pages/Approvals";
+import { UserManagement } from "./pages/UserManagement";
 const router = createBrowserRouter([
     {
         path: "/",
@@ -51,7 +52,7 @@ const router = createBrowserRouter([
                     },
                     {
                         path: "users",
-                        element: <PlaceholderPage title="Quản lý Người dùng" />,
+                        element: <UserManagement />,
                     },
                     {
                         path: "storage",
@@ -77,12 +78,12 @@ function App() {
             <RouterProvider router={router} />
             <GooeyToaster 
                 position="bottom-right"
-                toastOptions={{
-                    className: "glass-panel bg-white/80 backdrop-blur-xl border border-white/60 shadow-[0_8px_32px_rgba(99,102,241,0.15)] font-bold",
-                    style: {
-                        borderRadius: "24px",
-                    }
-                }}
+                duration={4000}
+                theme="light"
+                richColors
+                expand
+                visibleToasts={5}
+                closeButton
             />
         </>
     );

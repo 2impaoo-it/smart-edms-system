@@ -4,6 +4,13 @@ import type { UserRole } from "../../lib/types";
 import { FileExplorer } from "../../pages/FileExplorer";
 import { PlaceholderPage } from "../../pages/PlaceholderPage";
 import { AdminDashboard, ManagerDashboard, StaffDashboard } from "../../pages/Dashboard";
+import { Approvals } from "../../pages/Approvals";
+import { UserManagement } from "../../pages/UserManagement";
+import { StorageManagement } from "../../pages/StorageManagement";
+import { SystemLogs } from "../../pages/SystemLogs";
+import { Settings } from "../../pages/Settings";
+import { RecycleBin } from "../../pages/RecycleBin";
+import { SignatureManagement } from "../../pages/SignatureManagement";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 
 export interface AppNotification {
@@ -37,9 +44,9 @@ export function MainLayout() {
         { id: '3', title: 'Thành công', message: 'Tiến trình sao lưu dữ liệu hệ thống đã hoàn tất.', type: 'success', time: '2 giờ trước', isRead: true },
     ]);
 
-    // --- SECURITY: ADMIN CANNOT ACCESS PERSONAL FILES ---
+    // --- SECURITY: ADMIN CANNOT ACCESS PERSONAL/DEPARTMENT FILES ---
     useEffect(() => {
-        if (currentRole === 'ADMIN' && location.pathname === '/dashboard/files') {
+        if (currentRole === 'ADMIN' && (location.pathname === '/dashboard/files' || location.pathname === '/dashboard/department')) {
             navigate('/dashboard', { replace: true });
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -70,13 +77,13 @@ export function MainLayout() {
             return <FileExplorer title="Kho phòng ban" currentFolderId={currentFolderId} onFolderChange={handleFolderChange} ownerId={null} user={currentUser} folderType="DEPARTMENT" />;
         }
 
-        if (location.pathname === '/dashboard/recycle-bin') return <PlaceholderPage title="Thùng rác" />;
-        if (location.pathname === '/dashboard/audit-logs') return <PlaceholderPage title="Nhật ký Hệ thống" />;
-        if (location.pathname === '/dashboard/approvals') return <PlaceholderPage title="Quản lý Phê duyệt" />;
-        if (location.pathname === '/dashboard/signatures') return <PlaceholderPage title="Quản lý Chữ ký" />;
-        if (location.pathname === '/dashboard/users') return <PlaceholderPage title="Quản lý Người dùng" />;
-        if (location.pathname === '/dashboard/storage') return <PlaceholderPage title="Quản lý Lưu trữ" />;
-        if (location.pathname === '/dashboard/settings') return <PlaceholderPage title="Cài đặt Hệ thống" />;
+        if (location.pathname === '/dashboard/recycle-bin') return <RecycleBin />;
+        if (location.pathname === '/dashboard/audit-logs') return <SystemLogs />;
+        if (location.pathname === '/dashboard/approvals') return <Approvals />;
+        if (location.pathname === '/dashboard/signatures') return <SignatureManagement />;
+        if (location.pathname === '/dashboard/users') return <UserManagement />;
+        if (location.pathname === '/dashboard/storage') return <StorageManagement />;
+        if (location.pathname === '/dashboard/settings') return <Settings />;
         
         if (location.pathname === '/dashboard' || location.pathname === '/dashboard/') {
             if (currentRole === 'ADMIN') return <AdminDashboard user={currentUser} onNavigate={navigate} />;

@@ -5,7 +5,8 @@ import tailwindcss from "@tailwindcss/vite";
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const targetUrl = env.VITE_BACKEND_URL || 'http://localhost:8080';
+  // Đã cập nhật trỏ về API Gateway Ngrok (localhost:80)
+  const targetUrl = env.VITE_BACKEND_URL || 'https://pseudoeconomical-loise-interpolable.ngrok-free.dev';
   
   return {
     plugins: [react(), tailwindcss()],
