@@ -39,7 +39,7 @@ export const Approvals = () => {
             setApprovals(mapped);
         } catch (error) {
             console.error("Fetch pending approvals err:", error);
-            toast.error("Không thể tải danh sách chờ duyệt!");
+            toast.error("Tải dữ liệu thất bại", { description: "Không thể kết nối để lấy danh sách tài liệu chờ duyệt." });
         } finally {
             setIsLoading(false);
         }
@@ -64,7 +64,7 @@ export const Approvals = () => {
                 blobUrl = URL.createObjectURL(blob);
                 setPdfUrl(blobUrl);
             } catch (error) {
-                toast.error("Không thể tải PDF hoặc định dạng không hỗ trợ.");
+                toast.error("Không thể xem trước", { description: "Định dạng không hỗ trợ hoặc file PDF bị hỏng." });
             }
         };
 
@@ -78,27 +78,32 @@ export const Approvals = () => {
     const handleReject = async (id: string) => {
         try {
             await rejectDocument(id);
-            toast.success("Đã từ chối tài liệu");
+            toast.success("Từ chối thành công", { description: "Tài liệu đã được trả lại cho người trình ký." });
             fetchApprovals();
             setViewFileId(null);
         } catch (e: any) {
-            toast.error("Lỗi: " + e?.response?.data?.message);
+            toast.error("Thao tác thất bại", { description: e?.response?.data?.message || "Lỗi khi từ chối tài liệu." });
         }
     };
 
     const handleSignSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!viewFileId || !signP12File || !signPassword) {
-            toast.error("Vui lòng chọn file chứng thư (.p12) và nhập mật khẩu");
+            toast.error("Khung ký lỗi", { description: "Vui lòng chọn file chứng thư (.p12) và nhập mật khẩu." });
             return;
         }
 
         const signTask = signDocument(viewFileId, signP12File, signPassword, signReason, "Smart EDMS Core");
         
         toast.promise(signTask, {
-            loading: "Hệ thống đang mật mã hóa và đóng dấu PDF...",
-            success: "Tài liệu đã được ký số thành công!",
-            error: "Ký số thất bại. Sai mật khẩu hoặc file lỗi."
+            loading: "Đang xử lý chữ ký...",
+            success: "Ký duyệt thành công!",
+            error: "Ký số thất bại",
+            description: {
+                loading: "Hệ thống đang mật mã hóa và đóng dấu PDF...",
+                success: "Tài liệu đã được ký số và lưu trữ an toàn.",
+                error: "Sai mật khẩu hoặc file chứng thư số bị lỗi."
+            }
         });
 
         try {

@@ -77,12 +77,8 @@ function App() {
             <RouterProvider router={router} />
             <GooeyToaster 
                 position="bottom-right"
-                toastOptions={{
-                    className: "glass-panel bg-white/80 backdrop-blur-xl border border-white/60 shadow-[0_8px_32px_rgba(99,102,241,0.15)] font-bold",
-                    style: {
-                        borderRadius: "24px",
-                    }
-                }}
+                duration={4000}
+                theme="light"
             />
         </>
     );

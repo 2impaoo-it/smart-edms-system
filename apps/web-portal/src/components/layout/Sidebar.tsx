@@ -51,7 +51,7 @@ export function Sidebar({ role, user, notifications }: SidebarProps) {
         COMMON: [
             { name: "Tổng quan", href: "/dashboard", icon: LayoutDashboard },
             ...(role !== 'ADMIN' ? [{ name: "Tài liệu cá nhân", href: "/dashboard/files", icon: FileText }] : []),
-            { name: "Kho phòng ban", href: "/dashboard/department", icon: Briefcase },
+            ...(role !== 'ADMIN' ? [{ name: "Kho phòng ban", href: "/dashboard/department", icon: Briefcase }] : []),
             ...(role !== 'ADMIN' ? [{ name: "Thùng rác", href: "/dashboard/recycle-bin", icon: Trash2 }] : []),
         ],
         MANAGER: [
@@ -193,7 +193,7 @@ export function Sidebar({ role, user, notifications }: SidebarProps) {
                                                         <button 
                                                             onClick={() => {
                                                                 setShowNotifications(false);
-                                                                toast.success("Đã đánh dấu đọc tất cả");
+                                                                toast.success("Thành công", { description: "Đã đánh dấu đọc tất cả thông báo" });
                                                             }}
                                                             className="w-full py-2.5 rounded-xl text-xs font-bold text-primary bg-primary/10 hover:bg-primary hover:text-white transition-colors flex items-center justify-center gap-2"
                                                         >

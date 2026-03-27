@@ -138,7 +138,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                 setPdfUrl(blobUrl);
             } catch (error) {
                 console.error("Failed to fetch PDF", error);
-                toast.error("Không thể tải tài liệu hoặc tài liệu không phải là PDF.");
+                toast.error("Không thể xem trước", { description: "Định dạng không hỗ trợ hoặc file PDF bị hỏng." });
             }
         };
 
@@ -194,7 +194,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
             setFiles([...mappedFolders, ...mappedDocuments]);
         } catch (error) {
             console.error("Fetch error:", error);
-            toast.error("Không thể tải danh sách tài liệu. Vui lòng kiểm tra kết nối mạng.");
+            toast.error("Tải dữ liệu thất bại", { description: "Không thể lấy danh sách tài liệu. Vui lòng kiểm tra kết nối mạng." });
         } finally {
             setIsLoading(false);
         }
@@ -303,7 +303,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
         try {
             const apiParentId = (currentFolderId === 'root' || currentFolderId === 'dept_root') ? null : currentFolderId;
             await createFolder({ name: newFolderName, parentId: apiParentId, folderType });
-            toast.success(`Đã tạo thư mục: ${newFolderName}`);
+            toast.success("Tạo thư mục thành công", { description: `Đã khởi tạo không gian lưu trữ mới: ${newFolderName}` });
             
             // Re-fetch folders to get the real ID from DB
             fetchFilesAndFolders();
@@ -311,7 +311,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
             setShowNewFolderModal(false);
             setNewFolderName("");
         } catch (error: any) {
-            toast.error(error?.response?.data?.message || "Lỗi khi tạo thư mục");
+            toast.error("Tạo thư mục thất bại", { description: error?.response?.data?.message || "Lỗi hệ thống khi tạo thư mục." });
         }
     };
 
@@ -329,9 +329,14 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
             toast.promise(
                 uploadTask, 
                 {
-                    loading: `Đang tải lên: ${file.name}...`,
+                    loading: `Đang tải lên tài liệu...`,
                     success: `Tải lên thành công!`,
-                    error: 'Tải lên thất bại. Chỉ hỗ trợ định dạng PDF.'
+                    error: 'Tải lên thất bại',
+                    description: {
+                        loading: `Đang chuyển file ${file.name} lên máy chủ...`,
+                        success: "Tệp tin đã được lưu trữ an toàn và sẵn sàng sử dụng.",
+                        error: "Hệ thống chỉ hỗ trợ định dạng PDF, DOCX (Tối đa 50MB)."
+                    }
                 }
             );
             
@@ -349,15 +354,15 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
         try {
             if (fileToDelete?.type === 'folder') {
                 await deleteFolder(id);
-                toast.success(`Đã chuyển thư mục "${fileToDelete.name}" vào thùng rác`, { icon: '🗑️' });
+                toast.success("Đã xóa thư mục", { description: `Thư mục "${fileToDelete.name}" đã được chuyển vào thùng rác`, icon: '🗑️' });
                 fetchFilesAndFolders();
             } else {
                 await deleteDocument(id);
-                toast(`Đã chuyển file "${fileToDelete?.name}" vào thùng rác`, { icon: '🗑️' });
+                toast.success("Đã xóa tài liệu", { description: `Tệp tin "${fileToDelete?.name}" đã được chuyển vào thùng rác`, icon: '🗑️' });
                 fetchFilesAndFolders();
             }
         } catch (error: any) {
-            toast.error("Lỗi khi xóa: " + (error?.response?.data?.message || "Hệ thống bận"));
+            toast.error("Thao tác xóa thất bại", { description: error?.response?.data?.message || "Hệ thống bận, vui lòng thử lại sau" });
         }
         
         setContextMenu(null);
@@ -366,7 +371,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
     const handleRecall = (id: string) => {
         setFiles(files.map(f => {
             if (f.id === id) {
-                toast.success(`Đã thu hồi tài liệu "${f.name}"`);
+                toast.success("Đã thu hồi tài liệu", { description: `Tài liệu "${f.name}" đã được chuyển về trạng thái nháp.` });
                 return { ...f, status: 'DRAFT' };
             }
             return f;
@@ -383,7 +388,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
             setFileVersions(res.data || []);
         } catch(e) {
             console.error(e);
-            toast.error("Lỗi khi tải lịch sử phiên bản.");
+            toast.error("Lỗi xem lịch sử", { description: "Lỗi kết nối khi tải lịch sử phiên bản." });
         } finally {
             setIsHistoryLoading(false);
         }
@@ -402,8 +407,13 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
         const uploadTask = uploadNewDocumentVersion(fileId, file);
         toast.promise(uploadTask, {
             loading: `Đang tải lên phiên bản mới...`,
-            success: `Cập nhật phiên bản thành công!`,
-            error: 'Cập nhật thất bại. Vui lòng thử lại.'
+            success: `Cập nhật thành công!`,
+            error: 'Cập nhật thất bại',
+            description: {
+                loading: "Tài liệu đang được đồng bộ và cập nhật phiên bản...",
+                success: "Phiên bản mới đã được lưu vào hệ thống.",
+                error: "Dữ liệu không hợp lệ hoặc lỗi kết nối. Vui lòng thử lại."
+            }
         });
         
         uploadTask.then(() => {
@@ -422,9 +432,14 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
         const signTask = signDocument(viewFileId, signP12File, signPassword, signReason, "Smart EDMS Core");
         
         toast.promise(signTask, {
-            loading: "Hệ thống đang mật mã hóa và đóng dấu PDF...",
-            success: "Tài liệu đã được ký số thành công!",
-            error: "Ký số thất bại. Sai mật khẩu hoặc file lỗi."
+            loading: "Đang xử lý chữ ký...",
+            success: "Ký duyệt thành công!",
+            error: "Ký số thất bại",
+            description: {
+                loading: "Hệ thống đang mật mã hóa và đóng dấu PDF...",
+                success: "Tài liệu đã được ký số và lưu trữ an toàn.",
+                error: "Sai mật khẩu hoặc file chứng thư số bị lỗi."
+            }
         });
 
         try {
@@ -449,11 +464,11 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
         if (!shareFolderId || !shareUserId) return;
         try {
             await shareFolder(shareFolderId, parseInt(shareUserId), shareRole);
-            toast.success("Chia sẻ thư mục thành công!");
+            toast.success("Đã cấp quyền truy cập", { description: "Thư mục đã được chia sẻ thành công theo yêu cầu." });
             setShareFolderId(null);
             setShareUserId("");
         } catch (error: any) {
-            toast.error("Lỗi khi chia sẻ: " + (error?.response?.data?.message || "Mã nhân viên không đúng."));
+            toast.error("Chia sẻ thất bại", { description: error?.response?.data?.message || "Không xác định được mã nhân viên nhận." });
         }
     };
 
@@ -462,13 +477,13 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
         if (!viewFileId || !approverId) return;
         try {
             await submitForApproval(viewFileId, approverId);
-            toast.success("Trình ký tài liệu thành công!");
+            toast.success("Trình ký thành công", { description: "Tài liệu đã được gửi và đang chờ quản lý phê duyệt." });
             setIsSubmitModalOpen(false);
             setApproverId("");
             fetchFilesAndFolders();
             setViewFileId(null);
         } catch (e: any) {
-            toast.error("Lỗi trình ký: " + (e?.response?.data?.message || "Hệ thống bận"));
+            toast.error("Lỗi trình ký", { description: e?.response?.data?.message || "Không thể gửi yêu cầu trình duyệt." });
         }
     };
 
@@ -476,11 +491,11 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
         e.stopPropagation();
         try {
             await rejectDocument(id);
-            toast.success("Đã từ chối ký tài liệu!");
+            toast.success("Từ chối thành công", { description: "Đã hủy yêu cầu cấp phép cho tài liệu." });
             fetchFilesAndFolders();
             setViewFileId(null);
         } catch (e: any) {
-            toast.error("Lỗi từ chối: " + (e?.response?.data?.message || "Hệ thống bận"));
+            toast.error("Thao tác thất bại", { description: e?.response?.data?.message || "Lỗi khi xử lý thao tác từ chối." });
         }
     };
 

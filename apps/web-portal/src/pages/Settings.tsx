@@ -17,7 +17,7 @@ export const Settings = () => {
 
     const handleGenerateKeystore = async () => {
         if (!password || password.length < 6) {
-            toast.error("Vui lòng nhập mật khẩu tối thiểu 6 ký tự");
+            toast.error("Thiếu thông tin", { description: "Vui lòng nhập mật khẩu tối thiểu 6 ký tự." });
             return;
         }
 
@@ -35,11 +35,11 @@ export const Settings = () => {
             link.click();
             link.remove();
             
-            toast.success("Đã tải xuống khóa riêng tư (keystore.p12) thành công. Hãy cất giữ cẩn thận!");
+            toast.success("Khởi tạo thành công", { description: "Đã tải xuống khóa riêng tư (keystore.p12). Hãy cất giữ cẩn thận!" });
             setPassword('');
         } catch (error) {
             console.error(error);
-            toast.error("Lỗi khi tạo chứng thư số. Vui lòng thử lại.");
+            toast.error("Tạo khóa thất bại", { description: "Lỗi khi tạo chứng thư số. Vui lòng thử lại." });
         } finally {
             setIsGenerating(false);
         }

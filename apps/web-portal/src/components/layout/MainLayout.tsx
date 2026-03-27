@@ -37,9 +37,9 @@ export function MainLayout() {
         { id: '3', title: 'Thành công', message: 'Tiến trình sao lưu dữ liệu hệ thống đã hoàn tất.', type: 'success', time: '2 giờ trước', isRead: true },
     ]);
 
-    // --- SECURITY: ADMIN CANNOT ACCESS PERSONAL FILES ---
+    // --- SECURITY: ADMIN CANNOT ACCESS PERSONAL/DEPARTMENT FILES ---
     useEffect(() => {
-        if (currentRole === 'ADMIN' && location.pathname === '/dashboard/files') {
+        if (currentRole === 'ADMIN' && (location.pathname === '/dashboard/files' || location.pathname === '/dashboard/department')) {
             navigate('/dashboard', { replace: true });
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
