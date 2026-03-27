@@ -103,3 +103,10 @@
     --sidebar-width: 0px; /* Sidebar becomes a drawer on mobile */
   }
 }
+
+/* ── Goey-Toast / Sonner Z-Index Override ── */
+/* Đảm bảo toast luôn hiện trên sidebar (z-50) và modals (z-200) */
+[data-sonner-toaster] {
+  z-index: 99999 !important;
+}
+

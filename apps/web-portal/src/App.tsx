@@ -80,6 +80,10 @@ function App() {
                 position="bottom-right"
                 duration={4000}
                 theme="light"
+                richColors
+                expand
+                visibleToasts={5}
+                closeButton
             />
         </>
     );

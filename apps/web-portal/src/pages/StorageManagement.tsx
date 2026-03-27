@@ -79,10 +79,12 @@ export function StorageManagement() {
     const tId = toast("Đang khôi phục...", { description: "Đang phục hồi tệp từ thùng rác", duration: 100000 });
     try {
       await restoreDocument(id);
-      toast.success("Thành công", { id: tId, description: "Tài liệu đã được khôi phục về hệ thống" });
+      toast.dismiss(tId);
+      toast.success("Thành công", { description: "Tài liệu đã được khôi phục về hệ thống" });
       fetchTrash();
     } catch (err) {
-      toast.error("Thất bại", { id: tId, description: "Không thể khôi phục tài liệu này" });
+      toast.dismiss(tId);
+      toast.error("Thất bại", { description: "Không thể khôi phục tài liệu này" });
     }
   };
 
@@ -92,10 +94,12 @@ export function StorageManagement() {
     const tId = toast("Đang tiêu hủy...", { description: "Đang xóa cứng tài liệu...", duration: 100000 });
     try {
       await hardDeleteDocument(id);
-      toast.success("Đã tiêu hủy", { id: tId, description: "Tài liệu đã bị xóa vĩnh viễn khỏi hệ thống" });
+      toast.dismiss(tId);
+      toast.success("Đã tiêu hủy", { description: "Tài liệu đã bị xóa vĩnh viễn khỏi hệ thống" });
       fetchTrash();
     } catch (err) {
-      toast.error("Thất bại", { id: tId, description: "Không thể xóa cứng tài liệu này" });
+      toast.dismiss(tId);
+      toast.error("Thất bại", { description: "Không thể xóa cứng tài liệu này" });
     }
   };
 

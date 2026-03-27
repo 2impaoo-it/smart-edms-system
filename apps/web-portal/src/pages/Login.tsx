@@ -39,18 +39,18 @@ export function Login() {
     });
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
       const { data } = await login({ email: username, password: password });
+
+      // Dismiss loading toast trước
+      toast.dismiss(tId);
 
       if (data.mustChangePassword) {
         toast.error("Yêu cầu đổi mật khẩu", { 
-          id: tId, 
           description: "Vui lòng cập nhật mật khẩu mới ở lần đăng nhập đầu tiên." 
         });
         setTimeout(() => setShowPasswordChange(true), 500);
       } else {
         toast.success("Đăng nhập thành công!", { 
-          id: tId, 
           description: "Chào mừng bạn quay trở lại Smart EDMS." 
         });
         setTimeout(() => navigate("/dashboard"), 1500);
@@ -88,17 +88,20 @@ export function Login() {
         }),
       );
     } catch (err: any) {
+      // Dismiss loading toast trước
+      toast.dismiss(tId);
+
       const status = err.response?.status;
       const msg = err.response?.data?.message;
 
       if (status === 403 && msg === "Bạn phải đổi mật khẩu ở lần đăng nhập đầu tiên") {
-        toast.error("Tài khoản bảo mật", { id: tId, description: "Yêu cầu cập nhật mật khẩu mới ở lần đầu đăng nhập." });
+        toast.error("Tài khoản bảo mật", { description: "Yêu cầu cập nhật mật khẩu mới ở lần đầu đăng nhập." });
       } else if (status === 401) {
-        toast.error("Đăng nhập thất bại", { id: tId, description: "Sai email hoặc mật khẩu. Vui lòng kiểm tra lại." });
+        toast.error("Đăng nhập thất bại", { description: "Sai email hoặc mật khẩu. Vui lòng kiểm tra lại." });
       } else if (status === 503 || msg?.includes("maintenance") || msg?.includes("bảo trì")) {
-        toast.error("Hệ thống bảo trì", { id: tId, description: "Hệ thống đang được nâng cấp, vui lòng thử lại sau." });
+        toast.error("Hệ thống bảo trì", { description: "Hệ thống đang được nâng cấp, vui lòng thử lại sau." });
       } else {
-        toast.error("Lỗi hệ thống", { id: tId, description: msg || "Đăng nhập thất bại. Hệ thống không phản hồi." });
+        toast.error("Lỗi hệ thống", { description: msg || "Đăng nhập thất bại. Hệ thống không phản hồi." });
       }
     } finally {
       setIsLoading(false);
@@ -119,22 +122,21 @@ export function Login() {
     });
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1200));
       await changePasswordFirstTime({
         currentPassword: password,
         newPassword: newPassword,
       });
 
+      toast.dismiss(tId);
       toast.success("Đổi mật khẩu thành công!", { 
-        id: tId, 
         description: "Chào mừng bạn đến với hệ thống Smart EDMS."
       });
 
       setShowPasswordChange(false);
       setTimeout(() => navigate("/dashboard"), 1500);
     } catch (err: any) {
+      toast.dismiss(tId);
       toast.error("Đổi mật khẩu thất bại", {
-        id: tId,
         description: err.response?.data?.message || "Lỗi không xác định khi đổi mật khẩu."
       });
       console.error("Update password err:", err);

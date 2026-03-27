@@ -57,7 +57,6 @@ export function Sidebar({ role, user, notifications }: SidebarProps) {
         MANAGER: [
             { name: "Danh sách trình ký", href: "/dashboard/approvals", icon: PenTool, badge: 8 },
             { name: "Quản lý chữ ký", href: "/dashboard/signatures", icon: ShieldAlert },
-            { name: "Cài đặt & Khóa", href: "/dashboard/settings", icon: Settings },
         ],
         ADMIN: [
             { name: "Quản lý người dùng", href: "/dashboard/users", icon: Users },

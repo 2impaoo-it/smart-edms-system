@@ -75,8 +75,8 @@ export function UserManagement() {
     try {
       const { data } = await createUser(formData);
       
+      toast.dismiss(tId);
       toast.success("Tạo người dùng thành công!", {
-        id: tId,
         description: `Tài khoản ${data.username} đã được cấp pass mặc định và yêu cầu đổi mật khẩu.`
       });
 
@@ -90,8 +90,8 @@ export function UserManagement() {
       });
 
     } catch (err: any) {
+      toast.dismiss(tId);
       toast.error("Tạo người dùng thất bại", {
-        id: tId,
         description: err.response?.data?.message || "Lỗi hệ thống hoặc username/email đã bị trùng."
       });
       console.error(err);
