@@ -1,47 +1,31 @@
 package com.smartedms.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartedms.dto.AuditLogRequest;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 @Service
 public class AuditLogPublisherService {
 
-    private final RestTemplate restTemplate;
-    
-    @Value("${audit-service.url}")
-    private String auditServiceUrl;
-    
-    @Value("${audit.secret-key}")
-    private String auditSecretKey;
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final ObjectMapper objectMapper;
+    private static final String TOPIC = "smartedms.audit.logs";
 
-    public AuditLogPublisherService(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
+    public AuditLogPublisherService(KafkaTemplate<String, String> kafkaTemplate, ObjectMapper objectMapper) {
+        this.kafkaTemplate = kafkaTemplate;
+        this.objectMapper = objectMapper;
     }
 
     @Async
     public void publishLog(AuditLogRequest request) {
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("x-api-key", auditSecretKey);
-
-            HttpEntity<AuditLogRequest> entity = new HttpEntity<>(request, headers);
-
-            String url = auditServiceUrl + "/api/audit/logs";
-            restTemplate.postForEntity(url, entity, String.class);
-            
-            // Xóa console log sau khi test thành công để log sạch hơn, nhưng giữ lại catch để Fault Tolerance
+            String jsonLogMessage = objectMapper.writeValueAsString(request);
+            kafkaTemplate.send(TOPIC, jsonLogMessage);
         } catch (Exception e) {
-            // Lỗi gửi Log (vd Connection Refused do Node.js sập), bắt buộc Bắt (catch) 
-            // KHÔNG throw exception ra ngoài để không làm hỏng transaction chính của hệ thống.
-            // Fire-and-Forget.
-            System.err.println("Lỗi gửi Audit Log tới Node.js: " + e.getMessage());
+            // Fault Tolerance: Fire-and-Forget
+            System.err.println("Lỗi gửi Audit Log tới Kafka: " + e.getMessage());
         }
     }
 }

@@ -77,6 +77,10 @@ mongoose.connect(MONGO_URI)
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 
+// Import và chạy Kafka Consumer
+const runKafkaConsumer = require('./kafkaConsumer');
+runKafkaConsumer();
+
 server.listen(PORT, () => {
   console.log(`Audit Service is running on port ${PORT}`);
 });
