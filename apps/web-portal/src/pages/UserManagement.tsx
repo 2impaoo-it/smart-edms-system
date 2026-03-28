@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, Plus, Filter, UserCog, MoreHorizontal, Mail, Phone, Briefcase, AtSign, Loader2, X, CheckCircle2, RefreshCw } from "lucide-react";
 import { gooeyToast as toast } from "goey-toast";
 import { cn } from "../lib/utils";
-import { createUser, getUsers } from "../services/userService";
+import { createUser, getUsers, toggleUserStatus, resetUserKeystore } from "../services/userService";
 import type { CreateUserRequest } from "../services/userService";
 
 export function UserManagement() {
@@ -14,6 +14,7 @@ export function UserManagement() {
   
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [activeMenuId, setActiveMenuId] = useState<number | string | null>(null);
   
   // Form State
   const [formData, setFormData] = useState<CreateUserRequest>({
@@ -37,6 +38,35 @@ export function UserManagement() {
       toast.error("Lỗi tải danh sách", { description: "Không thể lấy danh sách người dùng từ Backend" });
     } finally {
       setIsLoadingUsers(false);
+    }
+  };
+
+  const handleToggleStatus = async (id: string | number) => {
+    setActiveMenuId(null);
+    const tId = toast("Đang xử lý...", { duration: 10000 });
+    try {
+      await toggleUserStatus(id);
+      toast.dismiss(tId);
+      toast.success("Thành công!", { description: "Đã thay đổi trạng thái tài khoản." });
+      fetchUsers();
+    } catch (err: any) {
+      toast.dismiss(tId);
+      toast.error("Thất bại", { description: err.response?.data?.message || "Lỗi hệ thống" });
+    }
+  };
+
+  const handleResetKeystore = async (id: string | number) => {
+    setActiveMenuId(null);
+    if (!confirm("Bạn có chắc chắn muốn reset keystore của người dùng này? Họ sẽ phải tạo lại chứng thư số.")) return;
+    const tId = toast("Đang xử lý...", { duration: 10000 });
+    try {
+      await resetUserKeystore(id);
+      toast.dismiss(tId);
+      toast.success("Thành công!", { description: "Đã reset keystore." });
+      fetchUsers();
+    } catch (err: any) {
+      toast.dismiss(tId);
+      toast.error("Thất bại", { description: err.response?.data?.message || "Lỗi hệ thống" });
     }
   };
 
@@ -183,9 +213,34 @@ export function UserManagement() {
                         </p>
                      </div>
                   </div>
-                  <button className="p-2 hover:bg-white/60 rounded-xl transition-all">
-                     <MoreHorizontal className="w-5 h-5 text-slate-400" />
-                  </button>
+                  <div className="relative">
+                     <button onClick={() => setActiveMenuId(activeMenuId === user.id ? null : user.id)} className="p-2 hover:bg-white/60 rounded-xl transition-all">
+                        <MoreHorizontal className="w-5 h-5 text-slate-400" />
+                     </button>
+                     <AnimatePresence>
+                        {activeMenuId === user.id && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 z-[100] overflow-hidden"
+                          >
+                            <button 
+                              onClick={() => handleToggleStatus(user.id)}
+                              className="w-full text-left px-4 py-3 text-sm font-bold hover:bg-slate-50 transition-colors gap-2 text-amber-600 block"
+                            >
+                              {user.isActive === false ? "Mở khóa tài khoản" : "Khóa tài khoản"}
+                            </button>
+                            <button 
+                              onClick={() => handleResetKeystore(user.id)}
+                              className="w-full text-left px-4 py-3 text-sm font-bold hover:bg-slate-50 transition-colors gap-2 text-destructive border-t border-slate-50 block"
+                            >
+                              Reset Keystore
+                            </button>
+                          </motion.div>
+                        )}
+                     </AnimatePresence>
+                  </div>
                </div>
 
                <div className="space-y-3 flex-1">

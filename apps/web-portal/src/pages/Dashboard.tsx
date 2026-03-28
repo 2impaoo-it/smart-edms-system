@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
      
@@ -26,18 +26,34 @@ import {
 
 import { cn } from "../lib/utils";
 import { SignerWorkspace } from "./SignerWorkspace";
+import { getDashboardOverview, getSystemHealth, getDashboardStorage } from "../services/adminService";
+import { getAuditLogs } from "../services/auditService";
+import { getPosts, createPost, toggleLike, addComment } from "../services/feedService";
+import { initSocket, disconnectSocket } from "../services/socketService";
 
 // --- 1. ADMIN DASHBOARD ---
 export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: string) => void }) {
+    const [overview, setOverview] = useState({ totalFolders: 0, totalDocuments: 0, statusBreakdown: {} as any });
+    const [storage, setStorage] = useState({ usedBytes: 0, usedGb: 0 });
+    const [logs, setLogs] = useState<any[]>([]);
+    const [health, setHealth] = useState<any>({ database: "OPTIMAL", "spring-boot": "OPTIMAL", minio: "OPTIMAL" });
+
+    useEffect(() => {
+        getDashboardOverview().then(res => setOverview(res.data)).catch(console.error);
+        getDashboardStorage().then(res => setStorage(res.data)).catch(console.error);
+        getSystemHealth().then(res => setHealth(res.data)).catch(console.error);
+        getAuditLogs({ limit: 5 }).then(res => setLogs(res.data || [])).catch(console.error);
+    }, []);
+
     return (
         <div className="space-y-6 lg:space-y-8 animate-in fade-in duration-700 pb-20">
             {/* Stats Overview */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
                 {[
-                    { label: "Tổng lưu trữ", val: { totalFiles: 0, totalStorage: "0 GB", pendingApprovals: 0, signedToday: 0, activeUsers: 0 }.totalStorage, icon: HardDrive, color: "text-primary", bg: "bg-primary/10", border: "border-l-primary" },
-                    { label: "Người dùng hệ thống", val: { totalFiles: 0, totalStorage: "0 GB", pendingApprovals: 0, signedToday: 0, activeUsers: 0 }.activeUsers, icon: Users, color: "text-accent", bg: "bg-accent/10", border: "border-l-accent" },
-                    { label: "Tài liệu đã ký", val: { totalFiles: 0, totalStorage: "0 GB", pendingApprovals: 0, signedToday: 0, activeUsers: 0 }.signedToday, icon: CheckCircle2, color: "text-success", bg: "bg-success/10", border: "border-l-success" },
-                    { label: "Tiến trình chờ", val: { totalFiles: 0, totalStorage: "0 GB", pendingApprovals: 0, signedToday: 0, activeUsers: 0 }.pendingApprovals, icon: Clock, color: "text-warning", bg: "bg-warning/10", border: "border-l-warning" }
+                    { label: "Tổng lưu trữ", val: `${storage?.usedGb || 0} GB`, icon: HardDrive, color: "text-primary", bg: "bg-primary/10", border: "border-l-primary" },
+                    { label: "Người dùng hệ thống", val: 5, icon: Users, color: "text-accent", bg: "bg-accent/10", border: "border-l-accent" },
+                    { label: "Tài liệu đã ký", val: overview?.statusBreakdown?.SIGNED || 0, icon: CheckCircle2, color: "text-success", bg: "bg-success/10", border: "border-l-success" },
+                    { label: "Tiến trình chờ", val: overview?.statusBreakdown?.WAITING || 0, icon: Clock, color: "text-warning", bg: "bg-warning/10", border: "border-l-warning" }
                 ].map((s, i) => (
                     <motion.div 
                         key={i} 
@@ -60,21 +76,27 @@ export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: 
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* System Logs Quick View */}
-                <div className="glass-panel rounded-[40px] p-8 shadow-2xl bg-white/40 border-white/60">
-                    <div className="flex justify-between items-center mb-8">
+                <div className="glass-panel rounded-[40px] p-8 shadow-2xl bg-white/40 border-white/60 flex flex-col h-full">
+                    <div className="flex justify-between items-center mb-8 shrink-0">
                         <h3 className="text-lg font-black tracking-tighter uppercase italic">Audit Logs Gần Đây</h3>
                         <button onClick={() => onNavigate('/dashboard/audit-logs')} className="text-[10px] font-black text-primary hover:underline uppercase tracking-widest">Xem tất cả</button>
                     </div>
-                    <div className="space-y-6">
-                        {[1, 2, 3, 4, 5].map(i => (
-                            <div key={i} className="flex gap-4 relative">
-                                {i !== 5 && <div className="absolute left-[11px] top-7 bottom-[-20px] w-px bg-slate-200 dark:bg-white/10" />}
-                                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center relative z-10">
+                    <div className="space-y-6 flex-1 overflow-auto pr-2">
+                        {logs.length === 0 ? <p className="text-sm text-slate-400 italic">Chưa có thay đổi gì gần đây.</p> : logs.map((log, i) => (
+                            <div key={log._id || i} className="flex gap-4 relative">
+                                {i !== logs.length - 1 && <div className="absolute left-[11px] top-7 bottom-[-20px] w-px bg-slate-200 dark:bg-white/10" />}
+                                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center relative z-10 shrink-0">
                                     <div className="w-2 h-2 rounded-full bg-primary shadow-neon" />
                                 </div>
                                 <div className="flex-1">
-                                    <p className="text-[11px] font-bold leading-tight">Phạm Giám Đốc <span className="text-muted-foreground font-medium italic">vừa thực hiện</span> Ký số tài liệu</p>
-                                    <p className="text-[9px] font-black text-muted-foreground/60 mt-1 uppercase">14:20 - Hôm nay</p>
+                                    <p className="text-[11px] font-bold leading-tight flex gap-1 flex-wrap">
+                                      <span className="text-slate-800">{log.userName || `User ${log.userId}`}</span> 
+                                      <span className="text-muted-foreground font-medium italic">thực hiện</span> 
+                                      <span className="text-primary">{log.actionType}</span>
+                                    </p>
+                                    <p className="text-[9px] font-black text-muted-foreground/60 mt-1 uppercase">
+                                      {new Date(log.timestamp).toLocaleString('vi-VN')} - {log.ipAddress || 'Unknown IP'}
+                                    </p>
                                 </div>
                             </div>
                         ))}
@@ -105,9 +127,9 @@ export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: 
                     <div className="relative z-10 flex justify-between items-end">
                         <div>
                             <p className="text-[10px] font-black uppercase opacity-60">Status</p>
-                            <p className="text-3xl font-black">OPTIMAL</p>
+                            <p className="text-3xl font-black">{health?.database === 'UP' ? "OPTIMAL" : (health?.database || "CHECKING")}</p>
                         </div>
-                        <button className="px-6 py-3 bg-white/20 backdrop-blur-md rounded-2xl text-[10px] font-black uppercase shadow-lg hover:bg-white/30 transition-all border border-white/20">Scan Now</button>
+                        <button onClick={() => getSystemHealth().then(r => setHealth(r.data))} className="px-6 py-3 bg-white/20 backdrop-blur-md rounded-2xl text-[10px] font-black uppercase shadow-lg hover:bg-white/30 transition-all border border-white/20">Scan Now</button>
                     </div>
                 </div>
             </div>
@@ -163,18 +185,7 @@ export function ManagerDashboard({ user }: { user: any, onNavigate: (path: strin
     };
 
     // --- Chat & Feed State ---
-    const [posts, setPosts] = useState<any[]>([
-        { 
-            id: 1, 
-            author: safeUser.name, 
-            role: 'Trưởng phòng', 
-            time: '2 giờ trước', 
-            content: 'Thông báo nội bộ: Tuần sau chúng ta sẽ có buổi training về Security. Yêu cầu toàn bộ nhân viên tham gia.', 
-            likes: 12, 
-            comments: [], 
-            isLiked: false 
-        }
-    ]);
+    const [posts, setPosts] = useState<any[]>([]);
     const [newPostContent, setNewPostContent] = useState("");
     const [newCommentText, setNewCommentText] = useState("");
     const [activeCommentPostId, setActiveCommentPostId] = useState<number | null>(null);
@@ -193,30 +204,57 @@ export function ManagerDashboard({ user }: { user: any, onNavigate: (path: strin
     });
     const [newMessage, setNewMessage] = useState("");
 
-    const handleCreatePost = (e: React.FormEvent) => {
+    useEffect(() => {
+        // Lấy Feed ban đầu
+        getPosts().then(res => setPosts(res.data)).catch(console.error);
+
+        // Khởi tạo Socket
+        const socket = initSocket(safeUser.token || "");
+        if (socket) {
+            socket.on("NEW_POST", (post) => {
+                setPosts(prev => [post, ...prev]);
+            });
+        }
+        return () => disconnectSocket();
+    }, [safeUser]);
+
+    const handleCreatePost = async (e: React.FormEvent) => {
         e.preventDefault();
         if(!newPostContent.trim()) return;
-        setPosts([{
-            id: Date.now(),
-            author: safeUser.name,
-            role: 'Trưởng phòng',
-            time: 'Vừa xong',
-            content: newPostContent,
-            likes: 0,
-            comments: [],
-            isLiked: false
-        }, ...posts]);
-        setNewPostContent("");
+        try {
+            const res = await createPost({ content: newPostContent, role: "Trưởng phòng" });
+            if (res.data) setPosts([res.data, ...posts]); // fallback if socket delay
+            setNewPostContent("");
+        } catch (err) {
+            console.error(err);
+        }
     };
 
-    const handleLike = (postId: number) => {
-        setPosts(prev => prev.map(p => p.id === postId ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 } : p));
+    const handleLike = async (postId: number) => {
+        const userId = safeUser.id || 1; 
+        try {
+            await toggleLike(postId, userId);
+            setPosts(prev => prev.map(p => {
+                if(p.id !== postId) return p;
+                const isLiked = !p.isLiked;
+                return { ...p, isLiked, likes: isLiked ? p.likes + 1 : p.likes - 1 };
+            }));
+        } catch(err) {
+            console.error(err);
+        }
     };
 
-    const handleSendComment = (postId: number) => {
+    const handleSendComment = async (postId: number) => {
         if (!newCommentText.trim()) return;
-        setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: [...p.comments, { id: Date.now(), author: safeUser.name, text: newCommentText, time: 'Vừa xong' }] } : p));
-        setNewCommentText("");
+        try {
+            const res = await addComment(postId, { author: safeUser.name, text: newCommentText });
+            if (res.data) {
+                setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: res.data.comments || [...p.comments, res.data] } : p));
+            }
+            setNewCommentText("");
+        } catch (err) {
+            console.error(err);
+        }
     };
 
     const handleSendMessage = (e: React.FormEvent) => {
@@ -716,39 +754,15 @@ export function ManagerDashboard({ user }: { user: any, onNavigate: (path: strin
 export function StaffDashboard({ user }: { user: any, onNavigate: (path: string) => void }) {
     const safeUser = user || { id: 'guest', name: 'Nhân viên', department: 'Phòng IT' };
     
-    // --- Mock Data ---
-    const [posts, setPosts] = useState([
-        { 
-            id: 1, 
-            author: 'Phạm Trưởng Phòng', 
-            role: 'Trưởng phòng ' + (safeUser.department || 'IT'), 
-            time: '2 giờ trước', 
-            content: 'Thông báo nội bộ: Tuần sau chúng ta sẽ có buổi training về Security lúc 9h sáng thứ 2. Mọi người sắp xếp thời gian tham gia đầy đủ nhé.', 
-            likes: 12, 
-            comments: [
-                { id: 101, author: 'Trần Nhân Viên', text: 'Đã nhận thông tin sếp ạ.', time: '1 giờ trước' }
-            ], 
-            isLiked: false 
-        },
-        { 
-            id: 2, 
-            author: 'Hệ thống Nhân Sự', 
-            role: 'Thông báo', 
-            time: 'Hôm qua', 
-            content: 'Chúc mừng sinh nhật các thành viên có ngày sinh trong tháng này! Bộ phận HR đã chuẩn bị quà tại quầy lễ tân. 🎂🎉', 
-            likes: 45, 
-            comments: [], 
-            isLiked: true 
-        }
-    ]);
-
+    // --- State ---
+    const [posts, setPosts] = useState<any[]>([]);
+    
     const [contacts] = useState([
         { id: 'u1', name: 'Trần Đồng Nghiệp', role: 'Developer', isOnline: true },
         { id: 'u2', name: 'Lê Kỹ Thuật', role: 'DevOps', isOnline: true },
         { id: 'u3', name: 'Nguyễn Tester', role: 'QA', isOnline: false },
     ]);
 
-    // --- State ---
     const [activeChatId, setActiveChatId] = useState<string | null>(null);
     const [chatMessages, setChatMessages] = useState<Record<string, {sender: string, text: string, time: string}[]>>({
         'u1': [
@@ -760,28 +774,44 @@ export function StaffDashboard({ user }: { user: any, onNavigate: (path: string)
     const [newCommentText, setNewCommentText] = useState("");
     const [activeCommentPostId, setActiveCommentPostId] = useState<number | null>(null);
 
+    useEffect(() => {
+        getPosts().then(res => setPosts(res.data)).catch(console.error);
+
+        const socket = initSocket(safeUser.token || "");
+        if (socket) {
+            socket.on("NEW_POST", (post) => {
+                setPosts(prev => [post, ...prev]);
+            });
+        }
+        return () => disconnectSocket();
+    }, [safeUser]);
+
     // --- Actions ---
-    const handleLike = (postId: number) => {
-        setPosts(prev => prev.map(p => {
-            if (p.id === postId) {
-                return { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 };
-            }
-            return p;
-        }));
+    const handleLike = async (postId: number) => {
+        const userId = safeUser.id || 2; 
+        try {
+            await toggleLike(postId, userId);
+            setPosts(prev => prev.map(p => {
+                if(p.id !== postId) return p;
+                const isLiked = !p.isLiked;
+                return { ...p, isLiked, likes: isLiked ? p.likes + 1 : p.likes - 1 };
+            }));
+        } catch(err) {
+            console.error(err);
+        }
     };
 
-    const handleSendComment = (postId: number) => {
+    const handleSendComment = async (postId: number) => {
         if (!newCommentText.trim()) return;
-        setPosts(prev => prev.map(p => {
-            if (p.id === postId) {
-                return { 
-                    ...p, 
-                    comments: [...p.comments, { id: Date.now(), author: safeUser.name, text: newCommentText, time: 'Vừa xong' }] 
-                };
+        try {
+            const res = await addComment(postId, { author: safeUser.name, text: newCommentText });
+            if (res.data) {
+                setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: res.data.comments || [...p.comments, res.data] } : p));
             }
-            return p;
-        }));
-        setNewCommentText("");
+            setNewCommentText("");
+        } catch (err) {
+            console.error(err);
+        }
     };
 
     const handleSendMessage = (e: React.FormEvent) => {
@@ -876,7 +906,7 @@ export function StaffDashboard({ user }: { user: any, onNavigate: (path: string)
                                             {post.comments.length === 0 ? (
                                                 <p className="text-xs text-center text-muted-foreground italic">Chưa có bình luận nào.</p>
                                             ) : (
-                                                post.comments.map(cmt => (
+                                                post.comments.map((cmt: any) => (
                                                     <div key={cmt.id} className="flex gap-3">
                                                         <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center shrink-0 font-bold text-xs text-slate-500">
                                                             {cmt.author.charAt(0)}

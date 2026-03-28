@@ -68,3 +68,9 @@ export const getFolderPermissions = (folderId: string) =>
 export const revokeFolderPermission = (folderId: string, userId: number) =>
   axiosClient.delete(`/folders/${folderId}/share/${userId}`);
 
+// ------------------- NEW APIS (Folder Trash) -------------------
+export const getTrashFolders = () => axiosClient.get("/categories/trash");
+
+export const restoreFolder = (id: string | number) => axiosClient.put(`/categories/${id}/restore`);
+
+export const hardDeleteFolder = (id: string | number) => axiosClient.delete(`/categories/${id}/hard-delete`);

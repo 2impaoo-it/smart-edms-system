@@ -33,10 +33,10 @@ public class User {
     @Column(name = "must_change_password", nullable = false)
     private boolean mustChangePassword = false;
 
-    @Column(name = "has_keystore", nullable = false)
+    @Column(name = "has_keystore", columnDefinition = "boolean default false")
     private boolean hasKeystore = false;
 
-    @Column(name = "is_active", nullable = false)
+    @Column(name = "is_active", columnDefinition = "boolean default true")
     private boolean isActive = true;
 
     @ElementCollection(fetch = FetchType.EAGER)
