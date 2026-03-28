@@ -10,6 +10,7 @@ import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { Settings } from "./pages/Settings";
 import { Approvals } from "./pages/Approvals";
 import { UserManagement } from "./pages/UserManagement";
+import { SignatureManagement } from "./pages/SignatureManagement";
 const router = createBrowserRouter([
     {
         path: "/",
@@ -48,7 +49,7 @@ const router = createBrowserRouter([
                     },
                     {
                         path: "signatures",
-                        element: <PlaceholderPage title="Quản lý Chữ ký" />,
+                        element: <SignatureManagement />,
                     },
                     {
                         path: "users",

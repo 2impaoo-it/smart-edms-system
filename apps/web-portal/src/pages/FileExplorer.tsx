@@ -22,13 +22,14 @@ import {
     ChevronRight,
     Home,
     Clock,
-    Users
+    Users,
+    CheckCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { FileItem, User } from "../lib/types";
 import { cn } from "../lib/utils";
 import { getFolderContents, createFolder, deleteFolder, getPersonalTree, getDepartmentTree, shareFolder } from "../services/folderService";
-import { uploadDocument, getDocumentStreamUrl, getFolderDocuments, deleteDocument, getDocumentVersions, getDocumentVersionStreamUrl, uploadNewDocumentVersion, signDocument, submitForApproval, rejectDocument } from "../services/documentService";
+import { uploadDocument, getDocumentStreamUrl, getFolderDocuments, deleteDocument, getDocumentVersions, getDocumentVersionStreamUrl, uploadNewDocumentVersion, signDocument, submitForApproval, rejectDocument, approveDocument } from "../services/documentService";
 
 interface FileExplorerProps {
     title: string;
@@ -496,6 +497,18 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
             setViewFileId(null);
         } catch (e: any) {
             toast.error("Thao tác thất bại", { description: e?.response?.data?.message || "Lỗi khi xử lý thao tác từ chối." });
+        }
+    };
+
+    const handleApproveWithoutSign = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        try {
+            await approveDocument(id);
+            toast.success("Phê duyệt thành công", { description: "Tài liệu đã được duyệt mà không cần chữ ký số." });
+            fetchFilesAndFolders();
+            setViewFileId(null);
+        } catch (e: any) {
+            toast.error("Thao tác thất bại", { description: e?.response?.data?.message || "Lỗi khi phê duyệt tài liệu." });
         }
     };
 
@@ -1061,6 +1074,11 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                                         {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && (fileToView.status === 'DRAFT' || fileToView.status === 'PENDING_APPROVAL') && (
                                             <button onClick={() => setIsSignModalOpen(true)} className="p-3 bg-primary text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
                                                 <PenTool className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Ký Số</span>
+                                            </button>
+                                        )}
+                                        {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && fileToView.status === 'PENDING_APPROVAL' && (
+                                            <button onClick={(e) => handleApproveWithoutSign(e, fileToView.id)} className="p-3 bg-success text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                                                <CheckCircle className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Duyệt nhanh</span>
                                             </button>
                                         )}
                                         {fileToView.status === 'PENDING_APPROVAL' && (user?.role === 'MANAGER' || user?.role === 'ADMIN') && (

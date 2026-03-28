@@ -3,7 +3,8 @@ import { createPortal } from "react-dom";
 import { Clock, FileText, CheckCircle, XCircle, Search, PenTool, X, ShieldAlert } from 'lucide-react';
 import { gooeyToast as toast } from "goey-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { getPendingApprovals, getDocumentStreamUrl, signDocument, rejectDocument } from '../services/documentService';
+import { getPendingApprovals, getDocumentStreamUrl, signDocument, rejectDocument, approveDocument } from '../services/documentService';
+import { getOrgChart } from '../services/userService';
 import type { FileItem } from '../lib/types';
 
 export const Approvals = () => {
@@ -24,18 +25,27 @@ export const Approvals = () => {
     const fetchApprovals = async () => {
         setIsLoading(true);
         try {
-            const res = await getPendingApprovals();
+            const [approvalsRes, usersRes] = await Promise.all([
+                getPendingApprovals(),
+                getOrgChart()
+            ]);
+            
+            const usersData = Array.isArray(usersRes.data) ? usersRes.data : [];
+
             // Map data
-            const rawDocs = Array.isArray(res.data) ? res.data : (res.data?.content || []);
-            const mapped = rawDocs.map((doc: any) => ({
-                id: String(doc.id),
-                name: doc.name,
-                type: 'file',
-                size: doc.fileSize ? `${(doc.fileSize / 1024).toFixed(1)} KB` : '--',
-                updatedAt: new Date(doc.createdAt).toLocaleDateString(),
-                owner: doc.userId || 'sys',
-                status: doc.status || 'PENDING_APPROVAL'
-            }));
+            const rawDocs = Array.isArray(approvalsRes.data) ? approvalsRes.data : (approvalsRes.data?.content || []);
+            const mapped = rawDocs.map((doc: any) => {
+                const owner = usersData.find((u: any) => u.id === doc.createdBy);
+                return {
+                    id: String(doc.id),
+                    name: doc.name,
+                    type: 'file',
+                    size: doc.fileSize ? `${(doc.fileSize / 1024).toFixed(1)} KB` : '--',
+                    updatedAt: new Date(doc.createdAt).toLocaleDateString(),
+                    owner: owner ? (owner.fullName || owner.username) : `ID: ${doc.createdBy}`,
+                    status: doc.status || 'PENDING_APPROVAL'
+                };
+            });
             setApprovals(mapped);
         } catch (error) {
             console.error("Fetch pending approvals err:", error);
@@ -83,6 +93,17 @@ export const Approvals = () => {
             setViewFileId(null);
         } catch (e: any) {
             toast.error("Thao tác thất bại", { description: e?.response?.data?.message || "Lỗi khi từ chối tài liệu." });
+        }
+    };
+
+    const handleApproveWithoutSign = async (id: string) => {
+        try {
+            await approveDocument(id);
+            toast.success("Phê duyệt thành công", { description: "Tài liệu đã được duyệt mà không cần chữ ký số." });
+            fetchApprovals();
+            setViewFileId(null);
+        } catch (e: any) {
+            toast.error("Thao tác thất bại", { description: e?.response?.data?.message || "Lỗi khi phê duyệt tài liệu." });
         }
     };
 
@@ -186,7 +207,7 @@ export const Approvals = () => {
                                             </div>
                                         </td>
                                         <td className="p-4">
-                                            <p className="text-sm font-bold text-slate-700">User ID: {file.owner}</p>
+                                            <p className="text-sm font-bold text-slate-700">{file.owner}</p>
                                         </td>
                                         <td className="p-4">
                                             <div className="flex items-center gap-1.5 text-xs text-slate-500"><Clock className="w-3.5 h-3.5" /> {file.updatedAt}</div>
@@ -231,6 +252,9 @@ export const Approvals = () => {
                                     <div className="flex gap-2">
                                         <button onClick={() => setIsSignModalOpen(true)} className="p-3 bg-primary text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
                                             <PenTool className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Ký Số Ngay</span>
+                                        </button>
+                                        <button onClick={() => handleApproveWithoutSign(fileToView.id)} className="p-3 bg-success text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                                            <CheckCircle className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Duyệt nhanh</span>
                                         </button>
                                         <button onClick={() => handleReject(fileToView.id)} className="p-3 bg-destructive text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
                                             <XCircle className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Từ chối</span>

@@ -79,6 +79,10 @@ export const rejectDocument = (id: string) => {
   return axiosClient.put(`/documents/${id}/reject`);
 };
 
+export const approveDocument = (id: string) => {
+  return axiosClient.put(`/documents/${id}/approve`);
+};
+
 export const getPendingApprovals = () => {
   return axiosClient.get("/documents/pending-approvals");
 };

@@ -1,16 +1,21 @@
 import { useState } from "react";
 import {
   ShieldCheck, Upload, FileKey, CheckCircle2, XCircle, RefreshCw, 
-  Lock, Eye, AlertTriangle
+  Lock, Eye, AlertTriangle, Download, User
 } from "lucide-react";
 import { gooeyToast as toast } from "goey-toast";
 import { cn } from "../lib/utils";
-import axiosClient from "../lib/axiosClient";
+import { generateKeystore, verifyKeystore, verifyPdf } from "../services/signatureService";
 
-type SigTab = "verify-keystore" | "verify-pdf";
+type SigTab = "generate" | "verify-keystore" | "verify-pdf";
 
 export function SignatureManagement() {
   const [activeTab, setActiveTab] = useState<SigTab>("verify-keystore");
+
+  // Generate State
+  const [genName, setGenName] = useState("");
+  const [genPass, setGenPass] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Verify Keystore State
   const [ksFile, setKsFile] = useState<File | null>(null);
@@ -23,6 +28,38 @@ export function SignatureManagement() {
   const [pdfResults, setPdfResults] = useState<any[] | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
+  // ─── Generate Keystore ───
+  const handleGenerate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!genName || !genPass) return;
+    
+    setIsGenerating(true);
+    const tId = toast("Đang khởi tạo chứng thư...", { duration: 30000 });
+    try {
+        const blob = await generateKeystore(genName, genPass);
+        toast.dismiss(tId);
+        toast.success("Khởi tạo thành công!", { description: "Vui lòng lưu giữ file .p12 cẩn thận." });
+        
+        // Download file
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `${genName.replace(/\s+/g, '_')}_signature.p12`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+        
+        setGenName("");
+        setGenPass("");
+    } catch (err: any) {
+        toast.dismiss(tId);
+        toast.error("Lỗi khởi tạo", { description: "Không thể tạo chứng thư số lúc này." });
+    } finally {
+        setIsGenerating(false);
+    }
+  };
+
   // ─── Verify Keystore ───
   const handleVerifyKeystore = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,15 +71,10 @@ export function SignatureManagement() {
     setKsResult(null);
     const tId = toast("Đang xác minh chứng thư số...", { duration: 15000 });
     try {
-      const formData = new FormData();
-      formData.append("file", ksFile);
-      formData.append("password", ksPassword);
-      const res = await axiosClient.post("/v1/signature/verify-keystore", formData, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
+      const data = await verifyKeystore(ksFile, ksPassword);
       toast.dismiss(tId);
       toast.success("Chứng thư số hợp lệ!", { description: "Keystore của bạn chính hãng và còn hiệu lực." });
-      setKsResult(typeof res.data === 'string' ? res.data : JSON.stringify(res.data, null, 2));
+      setKsResult(typeof data === 'string' ? data : JSON.stringify(data, null, 2));
     } catch (err: any) {
       toast.dismiss(tId);
       toast.error("Chứng thư không hợp lệ", { description: err.response?.data?.message || err.response?.data || "Sai mật khẩu hoặc file bị hỏng." });
@@ -63,13 +95,8 @@ export function SignatureManagement() {
     setPdfResults(null);
     const tId = toast("Đang phân tích chữ ký PDF...", { duration: 15000 });
     try {
-      const formData = new FormData();
-      formData.append("pdfFile", pdfFile);
-      const res = await axiosClient.post("/v1/signature/verify-pdf", formData, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
+      const results = await verifyPdf(pdfFile);
       toast.dismiss(tId);
-      const results = Array.isArray(res.data) ? res.data : [];
       setPdfResults(results);
       if (results.length === 0) {
         toast.info("Không tìm thấy chữ ký", { description: "PDF này chưa được ký số." });
@@ -93,12 +120,21 @@ export function SignatureManagement() {
           Quản Lý Chữ Ký Số
         </h2>
         <p className="text-sm text-muted-foreground font-medium mt-1">
-          Xác minh tính hợp lệ của Chứng thư số (.p12) và kiểm tra chữ ký trong tài liệu PDF.
+          Khởi tạo, xác minh tính hợp lệ của Chứng thư số (.p12) và kiểm tra chữ ký trong tài liệu PDF.
         </p>
       </div>
 
       {/* TABS */}
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={() => setActiveTab("generate")}
+          className={cn(
+            "px-6 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
+            activeTab === "generate" ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white/60 text-muted-foreground hover:bg-white"
+          )}
+        >
+          <PenTool className="w-4 h-4" /> Cấp mới Chứng thư
+        </button>
         <button
           onClick={() => setActiveTab("verify-keystore")}
           className={cn(
@@ -119,9 +155,65 @@ export function SignatureManagement() {
         </button>
       </div>
 
+      {/* ═══ GENERATE TAB ═══ */}
+      {activeTab === "generate" && (
+        <div className="glass-panel rounded-[40px] shadow-2xl bg-white/70 border-white/60 overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
+          <div className="p-8 border-b border-white/60 bg-indigo-50/30">
+            <h3 className="text-lg font-bold flex items-center gap-2"><PenTool className="w-5 h-5 text-indigo-600" /> Cấp mới Chứng thư số cá nhân</h3>
+            <p className="text-xs text-muted-foreground mt-1">Hệ thống sẽ tạo file chứng thư (.p12) dùng để ký số tài liệu pháp lý.</p>
+          </div>
+          <div className="p-8">
+            <form onSubmit={handleGenerate} className="max-w-lg space-y-5">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Tên chủ sở hữu (Common Name)</label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    required
+                    value={genName}
+                    onChange={e => setGenName(e.target.value)}
+                    placeholder="Ví dụ: Nguyen Van A"
+                    className="w-full bg-white/50 border border-white/60 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Mật khẩu bảo vệ (Passphrase)</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="password"
+                    required
+                    value={genPass}
+                    onChange={e => setGenPass(e.target.value)}
+                    placeholder="Tối thiểu 6 ký tự..."
+                    className="w-full bg-white/50 border border-white/60 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+              </div>
+              <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl mb-4">
+                <p className="text-[10px] text-amber-700 leading-relaxed font-medium flex gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    Lưu ý: Mật khẩu này không thể khôi phục. Nếu quên, bạn sẽ phải yêu cầu quản trị viên reset và tạo lại chứng thư mới.
+                </p>
+              </div>
+              <button
+                type="submit"
+                disabled={isGenerating || !genName || genPass.length < 6}
+                className="w-full py-4 rounded-2xl bg-indigo-600 text-white text-xs font-black uppercase shadow-lg shadow-indigo-200 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isGenerating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                Khởi Tạo & Tải Xuống
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ═══ VERIFY KEYSTORE TAB ═══ */}
       {activeTab === "verify-keystore" && (
-        <div className="glass-panel rounded-[40px] shadow-2xl bg-white/70 border-white/60 overflow-hidden">
+        <div className="glass-panel rounded-[40px] shadow-2xl bg-white/70 border-white/60 overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
           <div className="p-8 border-b border-white/60 bg-white/40">
             <h3 className="text-lg font-bold flex items-center gap-2"><Lock className="w-5 h-5 text-primary" /> Xác minh Chứng thư số (.p12 / .pfx)</h3>
             <p className="text-xs text-muted-foreground mt-1">Upload file keystore và nhập mật khẩu để kiểm tra tính hợp lệ.</p>
@@ -171,7 +263,7 @@ export function SignatureManagement() {
 
       {/* ═══ VERIFY PDF TAB ═══ */}
       {activeTab === "verify-pdf" && (
-        <div className="glass-panel rounded-[40px] shadow-2xl bg-white/70 border-white/60 overflow-hidden">
+        <div className="glass-panel rounded-[40px] shadow-2xl bg-white/70 border-white/60 overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
           <div className="p-8 border-b border-white/60 bg-white/40">
             <h3 className="text-lg font-bold flex items-center gap-2"><Eye className="w-5 h-5 text-primary" /> Kiểm tra chữ ký trong PDF</h3>
             <p className="text-xs text-muted-foreground mt-1">Upload file PDF đã ký số để xác minh tính toàn vẹn và danh tính người ký.</p>
