@@ -169,7 +169,7 @@ export function SystemLogs() {
                           {info.label}
                         </span>
                         <span className="text-[10px] text-muted-foreground font-bold">
-                          bởi <strong className="text-slate-700">{log.performedBy || log.userId || '—'}</strong>
+                          bởi <strong className="text-slate-700">{log.actorName || log.performedBy || log.userId || '—'}</strong>
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground truncate" title={log.details}>

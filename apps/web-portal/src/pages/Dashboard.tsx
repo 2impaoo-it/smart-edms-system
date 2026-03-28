@@ -90,9 +90,9 @@ export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: 
                                 </div>
                                 <div className="flex-1">
                                     <p className="text-[11px] font-bold leading-tight flex gap-1 flex-wrap">
-                                      <span className="text-slate-800">{log.userName || `User ${log.userId}`}</span> 
+                                      <span className="text-slate-800">{log.actorName || log.userName || `User ${log.actorId || log.userId}`}</span> 
                                       <span className="text-muted-foreground font-medium italic">thực hiện</span> 
-                                      <span className="text-primary">{log.actionType}</span>
+                                      <span className="text-primary">{log.action || log.actionType}</span>
                                     </p>
                                     <p className="text-[9px] font-black text-muted-foreground/60 mt-1 uppercase">
                                       {new Date(log.timestamp).toLocaleString('vi-VN')} - {log.ipAddress || 'Unknown IP'}

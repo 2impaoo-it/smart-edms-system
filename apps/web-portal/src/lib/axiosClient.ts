@@ -28,7 +28,8 @@ axiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
     const requestUrl = error.config?.url || "";
-    const isAuxiliaryService = requestUrl.includes("/audit") || requestUrl.includes("/feed");
+    // Chỉ coi là service phụ nếu gọi TRỰC TIẾP (không qua /v1 proxy)
+    const isAuxiliaryService = (requestUrl.includes("/audit") || requestUrl.includes("/feed")) && !requestUrl.includes("/v1");
 
     if (!isAuxiliaryService) {
       if (error.response?.status === 401 || (error.response?.status === 403 && error.response?.data?.message === "Bạn phải đổi mật khẩu ở lần đăng nhập đầu tiên")) {
