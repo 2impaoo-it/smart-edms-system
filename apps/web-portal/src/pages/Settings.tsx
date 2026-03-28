@@ -263,111 +263,111 @@ export const Settings = () => {
                 <>
                     <div className="pt-4">
                         <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2 mb-6">
-                            <Server className="w-5 h-5 text-primary" /> Trạng thái Hạ tầng
+                            <Shield className="w-5 h-5 text-primary" /> Quản trị Hệ thống & Bảo mật
                         </h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                         {/* PostgreSQL */}
-                        <div className="glass-panel p-5 rounded-[28px] bg-white/40 shadow-sm hover:shadow-lg transition-all">
+                        <div className="glass-panel p-5 rounded-[28px] bg-white/40 shadow-sm hover:shadow-lg transition-all border-l-4 border-l-blue-500">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center"><Database className="w-5 h-5" /></div>
                                 <div>
-                                    <h4 className="font-bold text-sm">PostgreSQL</h4>
-                                    <p className="text-[10px] text-muted-foreground font-bold">Primary Database</p>
+                                    <h4 className="font-bold text-sm">PostgreSQL Cluster</h4>
+                                    <p className="text-[10px] text-muted-foreground font-bold">Relational Database</p>
                                 </div>
-                                <div className="ml-auto flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /><span className="text-[9px] font-black text-emerald-600 uppercase">Online</span></div>
+                                <div className="ml-auto flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /><span className="text-[9px] font-black text-emerald-600 uppercase">Stable</span></div>
                             </div>
                             <div className="space-y-2 text-xs">
-                                <div className="flex justify-between"><span className="text-muted-foreground">Host</span><span className="font-bold">localhost:5432</span></div>
-                                <div className="flex justify-between"><span className="text-muted-foreground">Database</span><span className="font-bold">smartedms</span></div>
+                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Uptime</span><span className="font-bold text-success">99.99%</span></div>
+                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Connections</span><span className="font-bold">12 / 100</span></div>
                             </div>
                         </div>
 
                         {/* MinIO */}
-                        <div className="glass-panel p-5 rounded-[28px] bg-white/40 shadow-sm hover:shadow-lg transition-all">
+                        <div className="glass-panel p-5 rounded-[28px] bg-white/40 shadow-sm hover:shadow-lg transition-all border-l-4 border-l-orange-500">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center"><HardDrive className="w-5 h-5" /></div>
                                 <div>
-                                    <h4 className="font-bold text-sm">MinIO S3</h4>
-                                    <p className="text-[10px] text-muted-foreground font-bold">Object Storage</p>
+                                    <h4 className="font-bold text-sm">MinIO S3 Storage</h4>
+                                    <p className="text-[10px] text-muted-foreground font-bold">Object-based Storage</p>
                                 </div>
-                                <div className="ml-auto flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /><span className="text-[9px] font-black text-emerald-600 uppercase">Online</span></div>
+                                <div className="ml-auto flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /><span className="text-[9px] font-black text-emerald-600 uppercase">Ready</span></div>
                             </div>
                             <div className="space-y-2 text-xs">
-                                <div className="flex justify-between"><span className="text-muted-foreground">Endpoint</span><span className="font-bold">localhost:9000</span></div>
-                                <div className="flex justify-between"><span className="text-muted-foreground">Bucket</span><span className="font-bold">documents</span></div>
+                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Policy</span><span className="font-bold">Private-ACL</span></div>
+                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Region</span><span className="font-bold uppercase">vn-east-1</span></div>
                             </div>
                         </div>
 
                         {/* Kafka */}
-                        <div className="glass-panel p-5 rounded-[28px] bg-white/40 shadow-sm hover:shadow-lg transition-all">
+                        <div className="glass-panel p-5 rounded-[28px] bg-white/40 shadow-sm hover:shadow-lg transition-all border-l-4 border-l-violet-500">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center"><Wifi className="w-5 h-5" /></div>
                                 <div>
                                     <h4 className="font-bold text-sm">Apache Kafka</h4>
-                                    <p className="text-[10px] text-muted-foreground font-bold">Event Streaming</p>
+                                    <p className="text-[10px] text-muted-foreground font-bold">Event Log Pipeline</p>
                                 </div>
-                                <div className="ml-auto flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /><span className="text-[9px] font-black text-emerald-600 uppercase">Online</span></div>
+                                <div className="ml-auto flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /><span className="text-[9px] font-black text-emerald-600 uppercase">Syncing</span></div>
                             </div>
                             <div className="space-y-2 text-xs">
-                                <div className="flex justify-between"><span className="text-muted-foreground">Bootstrap</span><span className="font-bold">localhost:9092</span></div>
-                                <div className="flex justify-between"><span className="text-muted-foreground">Mode</span><span className="font-bold">KRaft</span></div>
+                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Topic Count</span><span className="font-bold">8 Active</span></div>
+                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Consumer</span><span className="font-bold">Audit-Service</span></div>
                             </div>
                         </div>
 
-                        {/* Gotenberg */}
-                        <div className="glass-panel p-5 rounded-[28px] bg-white/40 shadow-sm hover:shadow-lg transition-all">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center"><RefreshCw className="w-5 h-5" /></div>
-                                <div>
-                                    <h4 className="font-bold text-sm">Gotenberg</h4>
-                                    <p className="text-[10px] text-muted-foreground font-bold">PDF Converter</p>
-                                </div>
-                                <div className="ml-auto flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /><span className="text-[9px] font-black text-emerald-600 uppercase">Online</span></div>
-                            </div>
-                            <div className="space-y-2 text-xs">
-                                <div className="flex justify-between"><span className="text-muted-foreground">URL</span><span className="font-bold">localhost:3001</span></div>
-                                <div className="flex justify-between"><span className="text-muted-foreground">Engine</span><span className="font-bold">LibreOffice</span></div>
-                            </div>
-                        </div>
-
-                        {/* Nginx */}
-                        <div className="glass-panel p-5 rounded-[28px] bg-white/40 shadow-sm hover:shadow-lg transition-all">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-600 flex items-center justify-center"><Globe className="w-5 h-5" /></div>
-                                <div>
-                                    <h4 className="font-bold text-sm">Nginx Gateway</h4>
-                                    <p className="text-[10px] text-muted-foreground font-bold">API Gateway</p>
-                                </div>
-                                <div className="ml-auto flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /><span className="text-[9px] font-black text-emerald-600 uppercase">Online</span></div>
-                            </div>
-                            <div className="space-y-2 text-xs">
-                                <div className="flex justify-between"><span className="text-muted-foreground">Port</span><span className="font-bold">:80</span></div>
-                                <div className="flex justify-between"><span className="text-muted-foreground">Ngrok</span><span className="font-bold text-primary">Active</span></div>
-                            </div>
-                        </div>
-
-                        {/* JWT */}
-                        <div className="glass-panel p-5 rounded-[28px] bg-white/40 shadow-sm hover:shadow-lg transition-all">
+                        {/* Security */}
+                        <div className="glass-panel p-5 rounded-[28px] bg-white/40 shadow-sm hover:shadow-lg transition-all border-l-4 border-l-emerald-500">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center"><Shield className="w-5 h-5" /></div>
                                 <div>
-                                    <h4 className="font-bold text-sm">JWT Auth</h4>
-                                    <p className="text-[10px] text-muted-foreground font-bold">Security Layer</p>
+                                    <h4 className="font-bold text-sm">Security Layer</h4>
+                                    <p className="text-[10px] text-muted-foreground font-bold">Auth & Encryption</p>
+                                </div>
+                                <div className="ml-auto flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /><span className="text-[9px] font-black text-emerald-600 uppercase">High</span></div>
+                            </div>
+                            <div className="space-y-2 text-xs">
+                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">JWT TTL</span><span className="font-bold">24 Hours</span></div>
+                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Crypto</span><span className="font-bold uppercase">RSA-4096</span></div>
+                            </div>
+                        </div>
+
+                        {/* Backup */}
+                        <div className="glass-panel p-5 rounded-[28px] bg-white/40 shadow-sm hover:shadow-lg transition-all border-l-4 border-l-pink-500">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center"><Save className="w-5 h-5" /></div>
+                                <div>
+                                    <h4 className="font-bold text-sm">System Backup</h4>
+                                    <p className="text-[10px] text-muted-foreground font-bold">Scheduled Tasks</p>
+                                </div>
+                                <div className="ml-auto flex items-center gap-1.5"><span className="text-[9px] font-black text-slate-500 uppercase">Idle</span></div>
+                            </div>
+                            <div className="space-y-2 text-xs">
+                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Last Sync</span><span className="font-bold">04:00 AM Today</span></div>
+                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Storage</span><span className="font-bold">Off-site</span></div>
+                            </div>
+                        </div>
+
+                        {/* Logs */}
+                        <div className="glass-panel p-5 rounded-[28px] bg-white/40 shadow-sm hover:shadow-lg transition-all border-l-4 border-l-cyan-500">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-600 flex items-center justify-center"><Mail className="w-5 h-5" /></div>
+                                <div>
+                                    <h4 className="font-bold text-sm">Logging System</h4>
+                                    <p className="text-[10px] text-muted-foreground font-bold">Elastic / Audit</p>
                                 </div>
                                 <div className="ml-auto flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /><span className="text-[9px] font-black text-emerald-600 uppercase">Active</span></div>
                             </div>
                             <div className="space-y-2 text-xs">
-                                <div className="flex justify-between"><span className="text-muted-foreground">Algorithm</span><span className="font-bold">HS256</span></div>
-                                <div className="flex justify-between"><span className="text-muted-foreground">TTL</span><span className="font-bold">24 giờ</span></div>
+                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Logs/Min</span><span className="font-bold">~45 events</span></div>
+                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Retention</span><span className="font-bold">90 Days</span></div>
                             </div>
                         </div>
                     </div>
                 </>
             )}
 
-            {/* ═══ KEYSTORE GENERATOR (MANAGER/ADMIN) ═══ */}
-            {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && (
+            {/* ═══ KEYSTORE GENERATOR (MANAGER ONLY) ═══ */}
+            {user?.role === 'MANAGER' && (
                 <div className="glass-panel p-6 rounded-[32px] border border-white/20 bg-white/40 relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-1.5 h-full bg-red-500 rounded-l-[32px]"></div>
                     <div className="flex items-start gap-4">

@@ -82,7 +82,7 @@ export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: 
                         <button onClick={() => onNavigate('/dashboard/audit-logs')} className="text-[10px] font-black text-primary hover:underline uppercase tracking-widest">Xem tất cả</button>
                     </div>
                     <div className="space-y-6 flex-1 overflow-auto pr-2">
-                        {logs.length === 0 ? <p className="text-sm text-slate-400 italic">Chưa có thay đổi gì gần đây.</p> : logs.map((log, i) => (
+                        {(!Array.isArray(logs) || logs.length === 0) ? <p className="text-sm text-slate-400 italic">Chưa có thay đổi gì gần đây.</p> : logs.map((log, i) => (
                             <div key={log._id || i} className="flex gap-4 relative">
                                 {i !== logs.length - 1 && <div className="absolute left-[11px] top-7 bottom-[-20px] w-px bg-slate-200 dark:bg-white/10" />}
                                 <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center relative z-10 shrink-0">
