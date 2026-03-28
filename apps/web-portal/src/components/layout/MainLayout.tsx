@@ -37,12 +37,48 @@ export function MainLayout() {
     
     const currentFolderId = searchParams.get('folder');
 
-    // --- REAL NOTIFICATIONS SYSTEM ---
-    const [notifications] = useState<AppNotification[]>([
-        { id: '1', title: 'Tài liệu mới', message: 'Tài liệu "Quy_Trinh_Bao_Mat_2024.pdf" vừa được tải lên kho phòng ban.', type: 'info', time: 'Vừa xong', isRead: false },
-        { id: '2', title: 'Cần phê duyệt', message: 'Bạn có 3 hợp đồng đang chờ chữ ký số.', type: 'warning', time: '1 giờ trước', isRead: false },
-        { id: '3', title: 'Thành công', message: 'Tiến trình sao lưu dữ liệu hệ thống đã hoàn tất.', type: 'success', time: '2 giờ trước', isRead: true },
-    ]);
+    // --- REAL-TIME NOTIFICATIONS SYSTEM ---
+    const [notifications, setNotifications] = useState<AppNotification[]>([]);
+
+    useEffect(() => {
+        const stored = localStorage.getItem('token');
+        if (!stored || !currentUser) return;
+
+        const socket = import("../../services/socketService").then(m => m.initSocket(currentUser.id));
+        
+        socket.then(s => {
+            if (!s) return;
+            
+            s.on("NOTIFICATION", (msg: string) => {
+                const newNotif: AppNotification = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    title: 'Thông báo mới',
+                    message: msg,
+                    type: 'info',
+                    time: 'Vừa xong',
+                    isRead: false
+                };
+                setNotifications(prev => [newNotif, ...prev]);
+                toast.info(msg);
+            });
+
+            s.on("new_audit_log", (log: any) => {
+                const newNotif: AppNotification = {
+                    id: log._id || Math.random().toString(36).substr(2, 9),
+                    title: 'Hành động hệ thống',
+                    message: `${log.actorName || 'Ai đó'} vừa thực hiện ${log.action}`,
+                    type: 'success',
+                    time: 'Vừa xong',
+                    isRead: false
+                };
+                setNotifications(prev => [newNotif, ...prev]);
+            });
+        });
+
+        return () => {
+            import("../../services/socketService").then(m => m.disconnectSocket());
+        };
+    }, [currentUser]);
 
     // --- SECURITY: ADMIN CANNOT ACCESS PERSONAL/DEPARTMENT FILES ---
     useEffect(() => {

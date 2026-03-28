@@ -11,6 +11,10 @@ import { Settings } from "./pages/Settings";
 import { Approvals } from "./pages/Approvals";
 import { UserManagement } from "./pages/UserManagement";
 import { SignatureManagement } from "./pages/SignatureManagement";
+import { RecycleBin } from "./pages/RecycleBin";
+import { SystemLogs } from "./pages/SystemLogs";
+import { StorageManagement } from "./pages/StorageManagement";
+
 const router = createBrowserRouter([
     {
         path: "/",
@@ -37,11 +41,11 @@ const router = createBrowserRouter([
                     },
                     {
                         path: "recycle-bin",
-                        element: <PlaceholderPage title="Thùng rác" />,
+                        element: <RecycleBin />,
                     },
                     {
                         path: "audit-logs",
-                        element: <PlaceholderPage title="Nhật ký Hệ thống (Audit Logs)" />,
+                        element: <SystemLogs />,
                     },
                     {
                         path: "approvals",
@@ -57,7 +61,7 @@ const router = createBrowserRouter([
                     },
                     {
                         path: "storage",
-                        element: <PlaceholderPage title="Quản lý Lưu trữ" />,
+                        element: <StorageManagement />,
                     },
                     {
                         path: "settings",
