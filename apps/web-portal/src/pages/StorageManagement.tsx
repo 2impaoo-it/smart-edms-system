@@ -3,17 +3,24 @@ import { useState, useEffect } from "react";
 import { 
   Database, HardDrive, Trash2, Search, RefreshCw, 
   FileText, ShieldAlert, Cpu, CheckCircle2, 
-  Trash, SaveAll
+  Trash, SaveAll, AlertTriangle
 } from "lucide-react";
 import { gooeyToast as toast } from "goey-toast";
 import { cn } from "../lib/utils";
 import { 
-  searchDocuments, getTrashDocuments, restoreDocument, hardDeleteDocument
+  searchDocuments, restoreDocument, hardDeleteDocument
 } from "../services/documentService";
+import { 
+  getDashboardOverview, getDashboardStorage, getGlobalTrash, emptyGlobalTrash 
+} from "../services/adminService";
 
 export function StorageManagement() {
   const [activeTab, setActiveTab] = useState<'FILES' | 'TRASH'>('FILES');
   
+  // States - Dashboard Overview
+  const [overview, setOverview] = useState<any>(null);
+  const [storageUsage, setStorageUsage] = useState<any>(null);
+
   // States - Files
   const [files, setFiles] = useState<any[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
@@ -26,8 +33,23 @@ export function StorageManagement() {
 
   // Computed Stats from real API data
   const stats = {
-    totalFiles: fileTotal,
-    trashCount: (trashData || []).length
+    totalFiles: overview?.totalDocuments ?? 0,
+    trashCount: (trashData || []).length,
+    usedGb: storageUsage?.usedGb ?? 0
+  };
+
+  const fetchOverview = async () => {
+    try {
+      const [overviewRes, storageRes] = await Promise.all([
+        getDashboardOverview(),
+        getDashboardStorage()
+      ]);
+      setOverview(overviewRes.data);
+      setStorageUsage(storageRes.data);
+    } catch (err) {
+      console.error(err);
+      toast.error("Không thể tải thống kê tổng quan");
+    }
   };
 
   const fetchFiles = async () => {
@@ -51,15 +73,19 @@ export function StorageManagement() {
   const fetchTrash = async () => {
     setIsLoadingTrash(true);
     try {
-      const res = await getTrashDocuments();
+      const res = await getGlobalTrash();
       setTrashData(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error(err);
-      toast.error("Lỗi lấy thùng rác");
+      toast.error("Lỗi lấy danh sách thùng rác toàn hệ thống");
     } finally {
       setIsLoadingTrash(false);
     }
   };
+
+  useEffect(() => {
+    fetchOverview();
+  }, []);
 
   useEffect(() => {
     if (activeTab === 'FILES') {
@@ -82,6 +108,7 @@ export function StorageManagement() {
       toast.dismiss(tId);
       toast.success("Thành công", { description: "Tài liệu đã được khôi phục về hệ thống" });
       fetchTrash();
+      fetchOverview();
     } catch (err) {
       toast.dismiss(tId);
       toast.error("Thất bại", { description: "Không thể khôi phục tài liệu này" });
@@ -97,9 +124,26 @@ export function StorageManagement() {
       toast.dismiss(tId);
       toast.success("Đã tiêu hủy", { description: "Tài liệu đã bị xóa vĩnh viễn khỏi hệ thống" });
       fetchTrash();
+      fetchOverview();
     } catch (err) {
       toast.dismiss(tId);
       toast.error("Thất bại", { description: "Không thể xóa cứng tài liệu này" });
+    }
+  };
+
+  const handleEmptyTrash = async () => {
+    if (!window.confirm("CẢNH BÁO NGUY HIỂM: Hành động này sẽ xóa vĩnh viễn TOÀN BỘ tài liệu trong thùng rác hệ thống. Sẽ không thể khôi phục bằng bất cứ cách nào. Bạn có CHẮC CHẮN muốn dọn dẹp hệ thống không?")) return;
+
+    const tId = toast("Đang dọn dẹp hệ thống...", { description: "Quá trình này có thể mất thời gian...", duration: 30000 });
+    try {
+      await emptyGlobalTrash();
+      toast.dismiss(tId);
+      toast.success("Thành công", { description: "Thùng rác hệ thống đã được dọn sạch hoàn toàn" });
+      fetchTrash();
+      fetchOverview();
+    } catch (err) {
+      toast.dismiss(tId);
+      toast.error("Thất bại", { description: "Có lỗi khi dọn dẹp hệ thống" });
     }
   };
 
@@ -134,11 +178,11 @@ export function StorageManagement() {
            <div className="flex items-center gap-4 mb-4">
              <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center"><HardDrive className="w-6 h-6" /></div>
              <div>
-               <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Tổng tài liệu</p>
-               <h3 className="text-2xl font-black">{stats.totalFiles} files</h3>
+               <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Dung lượng MinIO</p>
+               <h3 className="text-2xl font-black">{stats.usedGb} GB</h3>
              </div>
            </div>
-           <p className="text-[10px] font-bold text-success mt-2 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Đã đồng bộ từ Database</p>
+           <p className="text-[10px] font-bold text-success mt-2 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Real-time tracking</p>
          </div>
 
          <div className="glass-panel p-6 rounded-[32px] shadow-lg bg-white/40 flex items-center gap-6">
@@ -146,20 +190,22 @@ export function StorageManagement() {
              <FileText className="w-8 h-8" />
            </div>
            <div>
-             <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Tổng File Hệ Thống</p>
-             <h3 className="text-4xl font-black text-primary">{fileTotal}</h3>
-             <p className="text-xs font-medium text-success mt-1 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Đã đồng bộ MinIO</p>
+             <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Tổng Tài Liệu</p>
+             <h3 className="text-4xl font-black text-primary">{stats.totalFiles}</h3>
+             <p className="text-xs font-medium text-success mt-1 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Đã phân mục</p>
            </div>
          </div>
 
-         <div className="glass-panel p-6 rounded-[32px] shadow-lg bg-white/40 border-l-4 border-l-destructive flex items-center gap-6">
-           <div className="w-16 h-16 rounded-3xl bg-destructive/10 text-destructive flex items-center justify-center">
-             <Trash2 className="w-8 h-8" />
-           </div>
-           <div>
-             <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Rác chờ tiêu hủy</p>
-             <h3 className="text-4xl font-black text-destructive">{stats.trashCount}</h3>
-             <p className="text-xs font-medium text-muted-foreground mt-1">Cần giải phóng định kỳ</p>
+         <div className="glass-panel p-6 rounded-[32px] shadow-lg bg-white/40 border-l-4 border-l-destructive flex items-center justify-between gap-6">
+           <div className="flex items-center gap-6">
+             <div className="w-16 h-16 rounded-3xl bg-destructive/10 text-destructive flex items-center justify-center">
+               <Trash2 className="w-8 h-8" />
+             </div>
+             <div>
+               <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Rác chờ tiêu hủy</p>
+               <h3 className="text-4xl font-black text-destructive">{stats.trashCount}</h3>
+               <p className="text-xs font-medium text-muted-foreground mt-1">Cần giải phóng định kỳ</p>
+             </div>
            </div>
          </div>
       </div>
@@ -168,7 +214,7 @@ export function StorageManagement() {
       <div className="glass-panel rounded-[40px] shadow-2xl bg-white/70 overflow-hidden border-white/60">
         
         {/* TABS HEADER */}
-        <div className="flex items-center border-b border-white/60 bg-white/40 px-6 pt-6 gap-6">
+        <div className="flex items-center border-b border-white/60 bg-white/40 px-6 pt-6 gap-6 relative">
            <button 
              onClick={() => setActiveTab('FILES')}
              className={cn("pb-4 text-sm font-black uppercase tracking-widest border-b-4 transition-all flex items-center gap-2", activeTab === 'FILES' ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-slate-800")}
@@ -181,6 +227,15 @@ export function StorageManagement() {
            >
              <ShieldAlert className="w-4 h-4" /> Thùng rác System
            </button>
+
+           {activeTab === 'TRASH' && (
+             <div className="absolute right-6 top-4">
+               <button onClick={handleEmptyTrash} className="px-4 py-2 bg-destructive/10 hover:bg-destructive text-destructive hover:text-white border border-destructive/20 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 transition-all">
+                 <AlertTriangle className="w-3 h-3" />
+                 Dọn sạch tất cả
+               </button>
+             </div>
+           )}
         </div>
 
         {/* TAB CONTENT: FILES */}
@@ -205,7 +260,7 @@ export function StorageManagement() {
              {isLoadingFiles ? (
                 <div className="py-20 flex flex-col items-center justify-center text-primary/50">
                   <RefreshCw className="w-12 h-12 animate-spin mb-4" />
-                  <p className="font-bold">Đang tải biểu đồ dữ liệu...</p>
+                  <p className="font-bold">Đang tải dữ liệu...</p>
                 </div>
              ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -224,11 +279,11 @@ export function StorageManagement() {
                           <h4 className="font-bold text-sm truncate" title={f.originalName || f.name}>{f.originalName || f.name}</h4>
                           <div className="flex justify-between items-end mt-2">
                              <div>
-                               <p className="text-[10px] text-muted-foreground uppercase font-bold">UID: {f.ownerId}</p>
-                               <p className="text-[10px] text-muted-foreground uppercase font-bold mt-0.5">{formatSize(f.sizeBytes)}</p>
+                               <p className="text-[10px] text-muted-foreground uppercase font-bold">UID: {f.ownerId || f.createdBy || 'Unknown'}</p>
+                               <p className="text-[10px] text-muted-foreground uppercase font-bold mt-0.5">{formatSize(f.sizeBytes || f.fileSize || 0)}</p>
                              </div>
                              <span className={cn("px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest", f.status === 'APPROVED' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning')}>
-                               {f.status}
+                               {f.status || 'DRAFT'}
                              </span>
                           </div>
                         </div>
@@ -266,12 +321,12 @@ export function StorageManagement() {
                       <div key={f.id} className="glass-panel p-5 rounded-3xl bg-white/80 border-l-4 border-l-destructive flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm hover:shadow-md transition-all">
                         <div className="flex items-center gap-4">
                           <Trash className="w-8 h-8 text-destructive/40" />
-                          <div>
-                            <h4 className="font-bold text-sm line-through text-slate-500">{f.originalName || f.name}</h4>
-                            <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1 text-destructive/60">UID: {f.ownerId} • Đã xóa lúc {f.updatedAt}</p>
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-sm line-through text-slate-500 truncate max-w-[200px] md:max-w-sm">{f.originalName || f.name}</h4>
+                            <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1 text-destructive/60">UID: {f.ownerId || f.createdBy || 'Unknown'} • Đã xóa lúc {f.updatedAt || f.deletedAt}</p>
                           </div>
                         </div>
-                        <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
+                        <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0 shrink-0">
                           <button onClick={() => handleRestore(f.id)} className="flex-1 md:flex-none px-5 py-2.5 bg-white border border-slate-200 hover:border-success hover:text-success rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-colors shadow-sm">
                             <SaveAll className="w-4 h-4" /> Khôi phục
                           </button>
