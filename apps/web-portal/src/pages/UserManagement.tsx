@@ -99,7 +99,7 @@ export function UserManagement() {
 
     const tId = toast("Đang tạo người dùng mới...", {
       description: "Hệ thống đang gọi API cấp quyền và khởi tạo Workspace...",
-      duration: 100000
+      duration: 15000
     });
 
     try {

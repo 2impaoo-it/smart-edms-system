@@ -35,7 +35,7 @@ export function Login() {
 
     const tId = toast("Đang xác thực thông tin...", {
       description: "Hệ thống đang kiểm tra danh tính của bạn...",
-      duration: 100000
+      duration: 15000
     });
 
     try {
@@ -94,14 +94,17 @@ export function Login() {
       const status = err.response?.status;
       const msg = err.response?.data?.message;
 
-      if (status === 403 && msg === "Bạn phải đổi mật khẩu ở lần đăng nhập đầu tiên") {
+      if (!err.response) {
+        // Network error - server không phản hồi
+        toast.error("Không thể kết nối", { description: "Máy chủ không phản hồi. Vui lòng kiểm tra kết nối mạng và thử lại." });
+      } else if (status === 403 && msg === "Bạn phải đổi mật khẩu ở lần đăng nhập đầu tiên") {
         toast.error("Tài khoản bảo mật", { description: "Yêu cầu cập nhật mật khẩu mới ở lần đầu đăng nhập." });
-      } else if (status === 401) {
-        toast.error("Đăng nhập thất bại", { description: "Sai email hoặc mật khẩu. Vui lòng kiểm tra lại." });
+      } else if (status === 401 || status === 403) {
+        toast.error("Sai thông tin đăng nhập", { description: "Tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại." });
       } else if (status === 503 || msg?.includes("maintenance") || msg?.includes("bảo trì")) {
         toast.error("Hệ thống bảo trì", { description: "Hệ thống đang được nâng cấp, vui lòng thử lại sau." });
       } else {
-        toast.error("Lỗi hệ thống", { description: msg || "Đăng nhập thất bại. Hệ thống không phản hồi." });
+        toast.error("Lỗi hệ thống", { description: msg || "Đã xảy ra lỗi không xác định. Vui lòng thử lại sau." });
       }
     } finally {
       setIsLoading(false);
@@ -118,7 +121,7 @@ export function Login() {
 
     const tId = toast("Đang cập nhật mật khẩu...", {
       description: "Hệ thống đang lưu thay đổi của bạn...",
-      duration: 100000
+      duration: 15000
     });
 
     try {

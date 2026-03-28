@@ -97,7 +97,7 @@ export const Settings = () => {
             return;
         }
         setIsChangingPass(true);
-        const tId = toast("Đang đổi mật khẩu...", { duration: 100000 });
+        const tId = toast("Đang đổi mật khẩu...", { duration: 15000 });
         try {
             await axiosClient.put('/auth/change-password', {
                 currentPassword: currentPass,

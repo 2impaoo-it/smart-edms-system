@@ -50,7 +50,7 @@ export function RecycleBin() {
 
   // ─── Restore / Hard-Delete for Documents ───
   const handleRestoreDoc = async (id: number) => {
-    const tId = toast("Đang khôi phục tài liệu...", { description: "Đang chuyển tệp ra khỏi thùng rác", duration: 100000 });
+    const tId = toast("Đang khôi phục tài liệu...", { description: "Đang chuyển tệp ra khỏi thùng rác", duration: 15000 });
     try {
       await restoreDocument(id);
       toast.dismiss(tId);
@@ -64,7 +64,7 @@ export function RecycleBin() {
 
   const handleHardDeleteDoc = async (id: number) => {
     if (!window.confirm("⚠️ CẢNH BÁO: Tệp sẽ bị xóa VĨNH VIỄN khỏi MinIO + Database. Tiếp tục?")) return;
-    const tId = toast("Đang tiêu hủy tài liệu...", { description: "Xóa cứng tệp trên hệ thống...", duration: 100000 });
+    const tId = toast("Đang tiêu hủy tài liệu...", { description: "Xóa cứng tệp trên hệ thống...", duration: 15000 });
     try {
       await hardDeleteDocument(id);
       toast.dismiss(tId);
@@ -78,7 +78,7 @@ export function RecycleBin() {
 
   // ─── Restore / Hard-Delete for Folders ───
   const handleRestoreFolder = async (id: number) => {
-    const tId = toast("Đang khôi phục thư mục...", { description: "Đang phục hồi thư mục...", duration: 100000 });
+    const tId = toast("Đang khôi phục thư mục...", { description: "Đang phục hồi thư mục...", duration: 15000 });
     try {
       await axiosClient.put(`/categories/${id}/restore`);
       toast.dismiss(tId);
@@ -92,7 +92,7 @@ export function RecycleBin() {
 
   const handleHardDeleteFolder = async (id: number) => {
     if (!window.confirm("⚠️ Thư mục sẽ bị xóa VĨNH VIỄN. Tiếp tục?")) return;
-    const tId = toast("Đang tiêu hủy thư mục...", { duration: 100000 });
+    const tId = toast("Đang tiêu hủy thư mục...", { duration: 15000 });
     try {
       await axiosClient.delete(`/categories/${id}/hard-delete`);
       toast.dismiss(tId);

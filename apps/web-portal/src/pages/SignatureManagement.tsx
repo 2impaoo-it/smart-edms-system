@@ -32,7 +32,7 @@ export function SignatureManagement() {
     }
     setKsLoading(true);
     setKsResult(null);
-    const tId = toast("Đang xác minh chứng thư số...", { duration: 100000 });
+    const tId = toast("Đang xác minh chứng thư số...", { duration: 15000 });
     try {
       const formData = new FormData();
       formData.append("file", ksFile);
@@ -61,7 +61,7 @@ export function SignatureManagement() {
     }
     setPdfLoading(true);
     setPdfResults(null);
-    const tId = toast("Đang phân tích chữ ký PDF...", { duration: 100000 });
+    const tId = toast("Đang phân tích chữ ký PDF...", { duration: 15000 });
     try {
       const formData = new FormData();
       formData.append("pdfFile", pdfFile);

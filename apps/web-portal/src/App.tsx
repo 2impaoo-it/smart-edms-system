@@ -81,7 +81,6 @@ function App() {
                 duration={4000}
                 theme="light"
                 richColors
-                expand
                 visibleToasts={5}
                 closeButton
             />

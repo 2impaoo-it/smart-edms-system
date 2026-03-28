@@ -76,7 +76,7 @@ export function StorageManagement() {
   };
 
   const handleRestore = async (id: number) => {
-    const tId = toast("Đang khôi phục...", { description: "Đang phục hồi tệp từ thùng rác", duration: 100000 });
+    const tId = toast("Đang khôi phục...", { description: "Đang phục hồi tệp từ thùng rác", duration: 15000 });
     try {
       await restoreDocument(id);
       toast.dismiss(tId);
@@ -91,7 +91,7 @@ export function StorageManagement() {
   const handleHardDelete = async (id: number) => {
     if (!window.confirm("CẢNH BÁO: Hành động này sẽ xóa vĩnh viễn tệp vật lý trên MinIO và Database. Không thể khôi phục! Tiếp tục?")) return;
     
-    const tId = toast("Đang tiêu hủy...", { description: "Đang xóa cứng tài liệu...", duration: 100000 });
+    const tId = toast("Đang tiêu hủy...", { description: "Đang xóa cứng tài liệu...", duration: 15000 });
     try {
       await hardDeleteDocument(id);
       toast.dismiss(tId);
