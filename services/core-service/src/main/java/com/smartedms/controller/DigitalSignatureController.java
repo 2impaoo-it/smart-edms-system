@@ -28,11 +28,17 @@ public class DigitalSignatureController {
 
     @Operation(summary = "Tạo mới cặp khóa RSA và trả về file .p12 (Keystore)")
     @PostMapping("/generate-keystore")
-    public ResponseEntity<byte[]> generateKeyStore(
+    public ResponseEntity<?> generateKeyStore(
             @RequestParam String commonName,
             @RequestParam String password,
             @AuthenticationPrincipal UserDetails userDetails) {
         try {
+            // Chặn tạo keystore lần 2 – yêu cầu Admin reset trước
+            if (userDetails != null && userManagementService.hasKeystoreByUsername(userDetails.getUsername())) {
+                return ResponseEntity.status(409)
+                        .body("Tài khoản đã được cấp chữ ký số. Vui lòng liên hệ Admin để reset trước khi tạo mới.");
+            }
+
             byte[] p12Bytes = signatureService.generateKeyStore(commonName, password);
             if (userDetails != null) {
                 userManagementService.updateKeystoreStatusByUsername(userDetails.getUsername(), true);

@@ -146,6 +146,16 @@ public class UserManagementService {
                 .build());
     }
 
+    /**
+     * Kiểm tra user đã sở hữu chữ ký số hay chưa.
+     * Dùng để chặn việc tạo keystore lần 2 nếu chưa được Admin reset.
+     */
+    public boolean hasKeystoreByUsername(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        return user.isHasKeystore();
+    }
+
     @Transactional
     public void updateKeystoreStatusByUsername(String username, boolean hasKeystore) {
         User user = userRepository.findByUsername(username)
