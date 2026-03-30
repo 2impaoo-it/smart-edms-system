@@ -259,8 +259,8 @@ export function UserManagement() {
 
               <div className="pt-4 border-t border-white/60 dark:border-white/10 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className={cn("w-2 h-2 rounded-full", user.isActive ? "bg-success animate-pulse" : "bg-slate-400")} />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{user.isActive ? "Online" : "Offline"}</span>
+                  <div className={cn("w-2 h-2 rounded-full", user.isActive ? "bg-success animate-pulse" : "bg-destructive")} />
+                  <span className={cn("text-[10px] font-black uppercase tracking-widest", user.isActive ? "text-success" : "text-destructive")}>{user.isActive ? "Hoạt động" : "Tạm khóa"}</span>
                 </div>
                 <div className="flex gap-2">
                   <button 
