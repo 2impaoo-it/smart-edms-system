@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import {
   History, Search, RefreshCw, Filter, FileText, UserCog, 
-  Trash2, Upload, ShieldCheck, AlertTriangle, CheckCircle2, Eye
+  Trash2, Upload, ShieldCheck, AlertTriangle, CheckCircle2, Eye,
+  Trash, SaveAll
 } from "lucide-react";
 import { gooeyToast as toast } from "goey-toast";
 import { cn } from "../lib/utils";
@@ -16,6 +17,9 @@ const ACTION_CONFIG: Record<string, { label: string; color: string; icon: any }>
   'CREATE_USER': { label: 'Tạo User', color: 'bg-violet-100 text-violet-700', icon: UserCog },
   'LOGIN': { label: 'Đăng nhập', color: 'bg-cyan-100 text-cyan-700', icon: CheckCircle2 },
   'VIEW_DOCUMENT': { label: 'Xem tài liệu', color: 'bg-slate-100 text-slate-700', icon: Eye },
+  'EMPTY_ALL_TRASH': { label: 'Dọn sạch thùng rác', color: 'bg-rose-100 text-rose-700', icon: Trash },
+  'RESTORE_DOCUMENT': { label: 'Khôi phục tài liệu', color: 'bg-teal-100 text-teal-700', icon: RefreshCw },
+  'UPLOAD_NEW_VERSION': { label: 'Cập nhật phiên bản', color: 'bg-indigo-100 text-indigo-700', icon: SaveAll },
 };
 
 export function SystemLogs() {

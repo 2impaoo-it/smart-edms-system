@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Plus, Filter, UserCog, MoreHorizontal, Mail, Phone, Briefcase, AtSign, Loader2, X, CheckCircle2, RefreshCw, ShieldAlert } from "lucide-react";
+import { Search, Plus, UserCog, MoreHorizontal, Mail, Briefcase, AtSign, Loader2, X, RefreshCw, ShieldAlert } from "lucide-react";
 import { cn } from "../lib/utils";
 import { gooeyToast as toast } from "goey-toast";
-import { getUsers, createUser, toggleUserStatus, resetUserKeystore } from "../services/userService";
-import axiosClient from "../lib/axiosClient";
+import { getUsers, createUser, toggleUserStatus, resetUserKeystore, updateUserJobTitle, getAllKeystores } from "../services/userService";
 
 type RoleFilter = "ALL" | "ADMIN" | "MANAGER" | "STAFF";
 
@@ -30,9 +29,18 @@ export function UserManagement() {
   const fetchUsers = async () => {
     setIsLoadingUsers(true);
     try {
-      const res = await getUsers();
-      const data = Array.isArray(res.data) ? res.data : [];
-      setUsers(data);
+      const [res, ksRes] = await Promise.all([
+          getUsers(),
+          getAllKeystores().catch(() => ({ data: [] })) // Fallback if API fails
+      ]);
+      const data = Array.isArray(res.data) ? res.data : (res.data?.content || []);
+      const keystores = Array.isArray(ksRes.data) ? ksRes.data : (ksRes.data?.content || []);
+      
+      const mergedData = data.map((u: any) => {
+          const ksInfo = keystores.find((k: any) => String(k.userId) === String(u.id) || String(k.id) === String(u.id));
+          return { ...u, hasKeystore: ksInfo ? ksInfo.hasKeystore : u.hasKeystore };
+      });
+      setUsers(mergedData);
     } catch (err) {
       console.error(err);
       toast.error("Lỗi tải danh sách", { description: "Không thể lấy danh sách người dùng từ Backend" });
@@ -92,13 +100,12 @@ export function UserManagement() {
     if (!editingUser) return;
     setIsUpdating(true);
     try {
-      // Giả định backend sẽ có API PUT /api/users/{id} nhận { jobTitle, fullName, ... }
-      await axiosClient.put(`/users/${editingUser.id}`, { jobTitle: editJobTitle });
+      await updateUserJobTitle(editingUser.id, editJobTitle);
       toast.success("Cập nhật thành công", { description: "Thông tin nghề nghiệp đã được cập nhật." });
       setEditingUser(null);
       fetchUsers();
     } catch (err: any) {
-      toast.error("Lỗi backend", { description: "Backend hiện chưa hỗ trợ API cập nhật thông tin user. Đang chờ nhóm Backend bổ sung." });
+      toast.error("Lỗi cập nhật", { description: err.response?.data?.message || "Không thể cập nhật chức danh" });
     } finally {
       setIsUpdating(false);
     }
@@ -111,27 +118,23 @@ export function UserManagement() {
     setNewRole("STAFF");
   };
 
-  // Map role từ backend (roles: [{name: "ROLE_ADMIN"}]) → tên hiển thị
   const getUserRole = (user: any) => {
-    const roles = Array.isArray(user.roles) ? user.roles : [];
-    
-    // Convert to simple string array
-    const roleNames = roles.map((r: any) => {
-      if (typeof r === 'string') return r.toUpperCase();
-      return (r.name || r.authority || '').toUpperCase();
-    });
-
-    if (roleNames.some(r => r.includes('ADMIN'))) return 'ADMIN';
-    if (roleNames.some(r => r.includes('MANAGER'))) return 'MANAGER';
-    if (roleNames.some(r => r.includes('USER') || r.includes('STAFF'))) return 'STAFF';
-    
-    // Fallback to legacy role field
-    if (user.role) {
-        const r = user.role.toUpperCase();
-        if (r.includes('ADMIN')) return 'ADMIN';
-        if (r.includes('MANAGER')) return 'MANAGER';
-        return 'STAFF';
+    let roleStrings: string[] = [];
+    if (Array.isArray(user.roles)) {
+       roleStrings = [...roleStrings, ...user.roles.map((r: any) => typeof r === 'string' ? r : (r.name || r.authority || ''))];
+    } 
+    if (Array.isArray(user.authorities)) {
+       roleStrings = [...roleStrings, ...user.authorities.map((r: any) => typeof r === 'string' ? r : (r.name || r.authority || ''))];
     }
+    if (user.role) roleStrings.push(user.role);
+
+    if (roleStrings.length === 0) return 'STAFF';
+
+    roleStrings = roleStrings.map(r => String(r).toUpperCase());
+
+    if (roleStrings.some(r => r.includes('ADMIN'))) return 'ADMIN';
+    if (roleStrings.some(r => r.includes('MANAGER'))) return 'MANAGER';
+    
     return 'STAFF';
   };
 

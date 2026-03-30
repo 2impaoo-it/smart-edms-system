@@ -10,6 +10,10 @@ export const getDashboardOverview = () => axiosClient.get("/v1/admin/dashboard/o
 
 export const getDashboardStorage = () => axiosClient.get("/v1/admin/dashboard/storage");
 
+export const getActivityStats = () => axiosClient.get("/v1/admin/dashboard/activity-stats");
+
+export const getStorageByDept = () => axiosClient.get("/v1/admin/dashboard/storage-by-dept");
+
 export const getGlobalTrash = () => axiosClient.get("/v1/admin/storage/trash");
 
 export const emptyGlobalTrash = () => axiosClient.delete("/v1/admin/storage/trash/empty");

@@ -219,7 +219,7 @@ export function StorageManagement() {
              onClick={() => setActiveTab('FILES')}
              className={cn("pb-4 text-sm font-black uppercase tracking-widest border-b-4 transition-all flex items-center gap-2", activeTab === 'FILES' ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-slate-800")}
            >
-             <Cpu className="w-4 h-4" /> Toàn bộ hệ thống
+             <Cpu className="w-4 h-4" /> Toàn bộ hệ thống ({fileTotal})
            </button>
            <button 
              onClick={() => setActiveTab('TRASH')}

@@ -168,7 +168,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
             
             // Map Backend Category to Frontend FileItem
             const mappedFolders: FileItem[] = rawFolders.map((cat: any) => ({
-                id: String(cat.id),
+                id: `folder_${cat.id}`,
                 name: cat.name,
                 type: 'folder',
                 size: '--',
@@ -181,7 +181,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
 
             // Map Backend Document to Frontend FileItem
             const mappedDocuments: FileItem[] = rawDocuments.map((doc: any) => ({
-                id: String(doc.id),
+                id: `doc_${doc.id}`,
                 name: doc.name,
                 type: 'file',
                 size: doc.fileSize ? `${(doc.fileSize / 1024).toFixed(1)} KB` : '--',
@@ -267,10 +267,11 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
     const handleFileClick = (e: React.MouseEvent, file: FileItem) => {
         e.preventDefault();
         e.stopPropagation();
+        const rawId = file.id.replace('folder_', '').replace('doc_', '');
         if (file.type === 'folder') {
-            onFolderChange(file.id);
+            onFolderChange(rawId);
         } else {
-            setViewFileId(file.id);
+            setViewFileId(rawId);
         }
     };
 
@@ -351,14 +352,15 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
 
     const handleDelete = async (id: string) => {
         const fileToDelete = files.find(f => f.id === id);
+        const rawId = id.replace('folder_', '').replace('doc_', '');
         
         try {
             if (fileToDelete?.type === 'folder') {
-                await deleteFolder(id);
+                await deleteFolder(rawId);
                 toast.success("Đã xóa thư mục", { description: `Thư mục "${fileToDelete.name}" đã được chuyển vào thùng rác`, icon: '🗑️' });
                 fetchFilesAndFolders();
             } else {
-                await deleteDocument(id);
+                await deleteDocument(rawId);
                 toast.success("Đã xóa tài liệu", { description: `Tệp tin "${fileToDelete?.name}" đã được chuyển vào thùng rác`, icon: '🗑️' });
                 fetchFilesAndFolders();
             }
@@ -382,10 +384,11 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
 
     const handleOpenHistory = async (fileId: string) => {
         setContextMenu(null);
-        setHistoryFileId(fileId);
+        const rawId = fileId.replace('folder_', '').replace('doc_', '');
+        setHistoryFileId(rawId);
         setIsHistoryLoading(true);
         try {
-            const res = await getDocumentVersions(fileId);
+            const res = await getDocumentVersions(rawId);
             setFileVersions(res.data || []);
         } catch(e) {
             console.error(e);
@@ -404,8 +407,9 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
     const handleUpdateVersion = (e: React.ChangeEvent<HTMLInputElement>, fileId: string) => {
         if (!e.target.files || e.target.files.length === 0) return;
         const file = e.target.files[0];
+        const rawId = fileId.replace('doc_', '');
         
-        const uploadTask = uploadNewDocumentVersion(fileId, file);
+        const uploadTask = uploadNewDocumentVersion(rawId, file);
         toast.promise(uploadTask, {
             loading: `Đang tải lên phiên bản mới...`,
             success: `Cập nhật thành công!`,
@@ -519,7 +523,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
         }
     };
 
-    const fileToView = files.find(f => f.id === viewFileId);
+    const fileToView = files.find(f => f.id.replace('folder_', '').replace('doc_', '') === String(viewFileId));
 
     return (
         <div 
@@ -699,7 +703,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                                 <Download className="w-4 h-4" /> Tải xuống
                             </button>
                             {contextMenu && files.find(f => f.id === contextMenu.id)?.type === 'folder' && folderType === 'DEPARTMENT' && (
-                                <button onClick={() => {setShareFolderId(contextMenu.id); setContextMenu(null);}} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-primary/10 hover:text-primary rounded-xl transition-colors">
+                                <button onClick={() => {setShareFolderId(contextMenu.id.replace('folder_', '')); setContextMenu(null);}} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-primary/10 hover:text-primary rounded-xl transition-colors">
                                     <Users className="w-4 h-4" /> Chia sẻ
                                 </button>
                             )}

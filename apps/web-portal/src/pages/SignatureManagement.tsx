@@ -117,13 +117,14 @@ export function SignatureManagement() {
     setPdfResults(null);
     const tId = toast("Đang phân tích chữ ký PDF...", { duration: 15000 });
     try {
-      const results = await verifyPdf(pdfFile);
+      const data: any = await verifyPdf(pdfFile);
       toast.dismiss(tId);
-      setPdfResults(results);
-      if (results.length === 0) {
+      const resultsArray = Array.isArray(data) ? data : (data?.signatures ? data.signatures : (data ? [data] : []));
+      setPdfResults(resultsArray);
+      if (resultsArray.length === 0) {
         toast.info("Không tìm thấy chữ ký", { description: "PDF này chưa được ký số." });
       } else {
-        toast.success(`Tìm thấy ${results.length} chữ ký`, { description: "Kết quả xác minh hiển thị bên dưới." });
+        toast.success(`Tìm thấy ${resultsArray.length} chữ ký`, { description: "Kết quả xác minh hiển thị bên dưới." });
       }
     } catch (err: any) {
       toast.dismiss(tId);
@@ -315,14 +316,14 @@ export function SignatureManagement() {
 
             {pdfResults !== null && (
               <div className="mt-6 space-y-3">
-                <h4 className="text-xs font-black uppercase text-muted-foreground">Kết quả ({pdfResults.length} chữ ký):</h4>
-                {pdfResults.length === 0 ? (
+                <h4 className="text-xs font-black uppercase text-muted-foreground">Kết quả ({(Array.isArray(pdfResults) ? pdfResults : []).length} chữ ký):</h4>
+                {(Array.isArray(pdfResults) ? pdfResults : []).length === 0 ? (
                   <div className="p-5 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/20 rounded-2xl flex items-center gap-3">
                     <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
                     <p className="text-sm font-medium text-amber-800 dark:text-amber-400">PDF này chưa có chữ ký số nào.</p>
                   </div>
                 ) : (
-                  pdfResults.map((sig, idx) => (
+                  (Array.isArray(pdfResults) ? pdfResults : []).map((sig: any, idx: number) => (
                     <div key={idx} className={cn(
                       "p-5 rounded-2xl border flex items-start gap-4",
                       sig.valid || sig.signatureValid ? "bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-900/20" : "bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/20"

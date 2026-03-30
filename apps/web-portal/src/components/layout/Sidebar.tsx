@@ -36,6 +36,27 @@ export function Sidebar({ role, user, notifications }: SidebarProps) {
     const location = useLocation();
     const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
     const [showNotifications, setShowNotifications] = useState(false);
+    const [pendingCount, setPendingCount] = useState<number>(0);
+    const [hasViewedApprovals, setHasViewedApprovals] = useState(false);
+
+    // Fetch pending approvals for MANAGER
+    useEffect(() => {
+        if (role === 'MANAGER') {
+            import('../../services/documentService').then(({ getPendingApprovals }) => {
+                getPendingApprovals().then(res => {
+                    const count = Array.isArray(res.data) ? res.data.length : (res.data?.content?.length || 0);
+                    setPendingCount(count);
+                }).catch(err => console.error("Could not fetch pending approvals count:", err));
+            });
+        }
+    }, [role]);
+
+    // Reset badge when visiting approvals page
+    useEffect(() => {
+        if (location.pathname === '/dashboard/approvals') {
+            setHasViewedApprovals(true);
+        }
+    }, [location.pathname]);
 
     // Click outside to close notifications
     useEffect(() => {
@@ -55,7 +76,7 @@ export function Sidebar({ role, user, notifications }: SidebarProps) {
             ...(role !== 'ADMIN' ? [{ name: "Thùng rác", href: "/dashboard/recycle-bin", icon: Trash2 }] : []),
         ],
         MANAGER: [
-            { name: "Danh sách trình ký", href: "/dashboard/approvals", icon: PenTool, badge: 8 },
+            { name: "Danh sách trình ký", href: "/dashboard/approvals", icon: PenTool, badge: (pendingCount > 0 && !hasViewedApprovals) ? pendingCount : undefined },
             { name: "Quản lý chữ ký", href: "/dashboard/signatures", icon: ShieldAlert },
         ],
         ADMIN: [

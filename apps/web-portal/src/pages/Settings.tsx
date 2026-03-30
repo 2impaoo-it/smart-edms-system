@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ShieldAlert, Key, Download, AlertTriangle, User, Server, Database, HardDrive, Wifi, RefreshCw, Shield, Globe, LogOut, Save, Lock, Mail, UserCircle, Camera } from 'lucide-react';
+import { ShieldAlert, Key, Download, AlertTriangle, User, Server, LogOut, Save, Lock, Mail, UserCircle, Camera } from 'lucide-react';
 import { gooeyToast as toast } from 'goey-toast';
 import { generateKeystore } from '../services/signatureService';
 import { useNavigate } from 'react-router';
@@ -83,6 +83,7 @@ export const Settings = () => {
             setUser(updatedUser);
             window.dispatchEvent(new Event('user-updated'));
             toast.success("Cập nhật hồ sơ", { description: "Thông tin cá nhân đã được lưu thành công." });
+            setTimeout(() => window.location.reload(), 1500);
         } catch {
             toast.error("Lỗi", { description: "Không thể cập nhật hồ sơ." });
         } finally {
@@ -225,6 +226,7 @@ export const Settings = () => {
                                 value={currentPass}
                                 onChange={e => setCurrentPass(e.target.value)}
                                 placeholder="Nhập mật khẩu cũ..."
+                                autoComplete="new-password"
                                 className="w-full bg-white/50 dark:bg-slate-900/50 border border-white/60 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 dark:text-white"
                             />
                         </div>
@@ -235,6 +237,7 @@ export const Settings = () => {
                                 value={newPass}
                                 onChange={e => setNewPass(e.target.value)}
                                 placeholder="Tối thiểu 6 ký tự..."
+                                autoComplete="new-password"
                                 className="w-full bg-white/50 dark:bg-slate-900/50 border border-white/60 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 dark:text-white"
                             />
                         </div>
@@ -245,6 +248,7 @@ export const Settings = () => {
                                 value={confirmPass}
                                 onChange={e => setConfirmPass(e.target.value)}
                                 placeholder="Nhập lại mật khẩu mới..."
+                                autoComplete="new-password"
                                 className={cn(
                                     "w-full bg-white/50 dark:bg-slate-900/50 border rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 dark:text-white",
                                     confirmPass && confirmPass !== newPass ? "border-destructive" : "border-white/60 dark:border-white/10"

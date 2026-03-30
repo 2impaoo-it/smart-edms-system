@@ -1,22 +1,16 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-     
     Users, 
-     
     HardDrive, 
-     
     Clock, 
     CheckCircle2, 
     FileText,
-    
     Search,
     Filter,
     Eye,
     Zap,
     Download,
-    
-    ShieldCheck,
     ShieldAlert,
     X,
     Heart,
@@ -25,8 +19,17 @@ import {
     MoreHorizontal,
     User,
     History,
-    AtSign
+    AtSign,
+    TrendingUp,
+    PieChart as PieChartIcon,
+    BarChart3
 } from "lucide-react";
+
+import { 
+    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+    PieChart, Pie, Cell, Legend,
+    BarChart, Bar, 
+} from 'recharts';
 
 import { cn } from "../lib/utils";
 import { SignerWorkspace } from "./SignerWorkspace";
@@ -36,12 +39,12 @@ import { getPosts, createPost, toggleLike, addComment } from "../services/feedSe
 import { initSocket, disconnectSocket } from "../services/socketService";
 import { gooeyToast as toast } from "goey-toast";
 
-// --- Helper: Get Numeric User ID ---
-const getNumericId = (user: any): number => {
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+
+// --- Helper: Get User ID ---
+const getUserId = (user: any): string | number => {
     if (!user) return 0;
-    // Try to get numeric id from full user object (fetched in MainLayout)
-    const id = parseInt(user.id);
-    return isNaN(id) ? 0 : id;
+    return user.id || user._id || 0;
 };
 
 // --- 1. ADMIN DASHBOARD ---
@@ -52,6 +55,10 @@ export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: 
     const [health, setHealth] = useState<any>({ database: "OPTIMAL", "spring-boot": "OPTIMAL", minio: "OPTIMAL" });
     const [totalUsers, setTotalUsers] = useState(0);
     
+    // Analytics State
+    const [activityData, setActivityData] = useState<any[]>([]);
+    const [storageByDept, setStorageByDept] = useState<any[]>([]);
+
     // Social Feed State
     const [posts, setPosts] = useState<any[]>([]);
     const [newPostContent, setNewPostContent] = useState("");
@@ -60,7 +67,40 @@ export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: 
         getDashboardOverview().then(res => setOverview(res.data)).catch(console.error);
         getDashboardStorage().then(res => setStorage(res.data)).catch(console.error);
         getSystemHealth().then(res => setHealth(res.data)).catch(console.error);
-        getAuditLogs({ limit: 5 }).then(res => {
+        
+        // Fetch new analytics data
+        import("../services/adminService").then(m => {
+            // Attempt to get activity stats, fallback to deriving from logs
+            m.getActivityStats().then(res => setActivityData(res.data)).catch(() => {
+                getAuditLogs({ limit: 100 }).then(auditRes => {
+                    const logsData = Array.isArray(auditRes.data) ? auditRes.data : (auditRes.data as any)?.data || [];
+                    const last7Days = Array.from({ length: 7 }, (_, i) => {
+                        const d = new Date();
+                        d.setDate(d.getDate() - i);
+                        return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
+                    }).reverse();
+
+                    const stats = last7Days.map(date => {
+                        const dayLogs = logsData.filter((l: any) => 
+                            new Date(l.timestamp || l.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }) === date
+                        );
+                        return {
+                            name: date,
+                            uploads: dayLogs.filter((l: any) => l.action?.includes("UPLOAD")).length,
+                            signs: dayLogs.filter((l: any) => l.action?.includes("SIGN")).length
+                        };
+                    });
+                    setActivityData(stats);
+                }).catch(() => setActivityData([]));
+            });
+
+            m.getStorageByDept().then(res => setStorageByDept(res.data)).catch(() => {
+                // If API not ready, we show empty or let the chart handle empty array
+                setStorageByDept([]);
+            });
+        });
+
+        getAuditLogs({ limit: 6 }).then(res => {
             const auditData = Array.isArray(res.data) ? res.data : (res.data as any)?.data || [];
             setLogs(auditData);
         }).catch(console.error);
@@ -70,11 +110,18 @@ export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: 
         }).catch(console.error);
     }, []);
 
+    const statusData = [
+        { name: 'Đang soạn', value: overview.statusBreakdown?.DRAFT || 0 },
+        { name: 'Chờ duyệt', value: overview.statusBreakdown?.WAITING || 0 },
+        { name: 'Đã ký', value: overview.statusBreakdown?.SIGNED || 0 },
+        { name: 'Đã duyệt', value: overview.statusBreakdown?.APPROVED || 0 },
+    ].filter(v => v.value > 0);
+
     const handleCreatePost = async (e: React.FormEvent) => {
         e.preventDefault();
         if(!newPostContent.trim()) return;
         const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-        const authorId = getNumericId(storedUser);
+        const authorId = getUserId(storedUser);
         
         if (authorId === 0) {
             toast.error("Lỗi xác thực", { description: "Không tìm thấy ID nhân viên. Vui lòng tải lại trang." });
@@ -127,8 +174,137 @@ export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: 
                 ))}
             </div>
 
+            {/* Analytics Spotlight */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="xl:col-span-3 lg:col-span-1 glass-panel p-8 rounded-[40px] bg-white/60 dark:bg-white/5 border-white/40 shadow-xl min-h-[400px]">
+                    <div className="flex justify-between items-center mb-8">
+                        <div>
+                            <h3 className="text-xl font-black uppercase italic gradient-text flex items-center gap-3">
+                                <TrendingUp className="w-6 h-6 text-primary" /> Hoạt động hệ thống
+                            </h3>
+                            <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest mt-1 ml-9">Thống kê tương tác 7 ngày gần nhất</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-black uppercase">
+                                <div className="w-2 h-2 rounded-full bg-primary" /> Tải file
+                            </div>
+                            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-success/10 text-success text-[10px] font-black uppercase">
+                                <div className="w-2 h-2 rounded-full bg-success" /> Ký duyệt
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={activityData}>
+                                <defs>
+                                    <linearGradient id="colorUploads" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                    </linearGradient>
+                                    <linearGradient id="colorSigns" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#88888820" />
+                                <XAxis 
+                                    dataKey="name" 
+                                    axisLine={false} 
+                                    tickLine={false} 
+                                    tick={{fontSize: 10, fontWeight: 900, fill: '#888'}}
+                                    dy={10}
+                                />
+                                <YAxis 
+                                    axisLine={false} 
+                                    tickLine={false} 
+                                    tick={{fontSize: 10, fontWeight: 900, fill: '#888'}}
+                                />
+                                <Tooltip 
+                                    contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontWeight: 800, fontSize: '12px' }}
+                                />
+                                <Area type="monotone" dataKey="uploads" stroke="#3b82f6" strokeWidth={4} fillOpacity={1} fill="url(#colorUploads)" />
+                                <Area type="monotone" dataKey="signs" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorSigns)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Distribution & Storage Charts */}
+                <div className="glass-panel p-8 rounded-[40px] bg-white/60 dark:bg-white/5 border-white/40 shadow-xl">
+                    <h3 className="text-lg font-black uppercase tracking-tighter mb-8 flex items-center gap-2">
+                        <PieChartIcon className="w-5 h-5 text-accent" /> Phân bổ tài liệu
+                    </h3>
+                    <div className="h-[250px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={statusData.length > 0 ? statusData : [{name: 'Trống', value: 1}]}
+                                    innerRadius={60}
+                                    outerRadius={80}
+                                    paddingAngle={8}
+                                    dataKey="value"
+                                >
+                                    {statusData.map((_, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                                <Legend 
+                                    verticalAlign="bottom" 
+                                    align="center"
+                                    iconType="circle"
+                                    formatter={(value) => <span className="text-[10px] font-black uppercase text-muted-foreground ml-1">{value}</span>}
+                                />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                <div className="glass-panel p-8 rounded-[40px] bg-white/60 dark:bg-white/5 border-white/40 shadow-xl">
+                    <h3 className="text-lg font-black uppercase tracking-tighter mb-8 flex items-center gap-2">
+                        <BarChart3 className="w-5 h-5 text-warning" /> Dung lượng theo bộ phận
+                    </h3>
+                    <div className="h-[250px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={storageByDept}>
+                                <XAxis 
+                                    dataKey="name" 
+                                    axisLine={false} 
+                                    tickLine={false} 
+                                    tick={{fontSize: 9, fontWeight: 900, fill: '#888'}}
+                                />
+                                <Tooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '12px', border: 'none' }} />
+                                <Bar dataKey="value" fill="#f59e0b" radius={[6, 6, 0, 0]} barSize={24} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                <div className="glass-panel p-8 rounded-[40px] bg-white/60 dark:bg-white/5 border-white/40 shadow-xl">
+                    <h3 className="text-lg font-black uppercase tracking-tighter mb-6 flex items-center gap-2">
+                        <ShieldAlert className="w-5 h-5 text-primary" /> Trạng thái Server
+                    </h3>
+                    <div className="space-y-4">
+                        {[
+                            { label: "Database", status: health?.database === 'UP' ? "OPTIMAL" : (health?.database || "CHECKING") },
+                            { label: "Backend", status: health?.["spring-boot"] === 'UP' ? "OPTIMAL" : (health?.["spring-boot"] || "CHECKING") },
+                            { label: "MinIO", status: health?.minio === 'UP' ? "OPTIMAL" : (health?.minio || "CHECKING") }
+                        ].map((item, i) => (
+                            <div key={i} className="flex items-center justify-between p-3 rounded-2xl bg-white/40 dark:bg-white/5 border border-white/60 dark:border-white/10">
+                                <span className="text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase">{item.label}</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black text-success uppercase">{item.status}</span>
+                                    <div className="w-2 h-2 rounded-full bg-success animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-                {/* Social Feed Section */}
+                {/* Social Feed Section (Now more compact) */}
                 <div className="xl:col-span-2 space-y-6">
                     <div className="glass-panel p-8 rounded-[40px] bg-white/60 dark:bg-white/5 border-white/40 shadow-xl">
                         <h3 className="text-xl font-black italic uppercase gradient-text mb-6 flex items-center gap-3">
@@ -147,7 +323,7 @@ export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: 
                             </button>
                         </form>
 
-                        <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2 scrollbar-hide">
+                        <div className="space-y-6 max-h-[500px] overflow-y-auto pr-2 scrollbar-hide">
                             {posts.length === 0 ? (
                                 <div className="text-center py-10 opacity-40">Chưa có bài đăng nào.</div>
                             ) : (
@@ -172,35 +348,12 @@ export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: 
                     </div>
                 </div>
 
-                {/* Side Info */}
+                {/* Recent Audit Mini */}
                 <div className="space-y-6">
-                    {/* System Health */}
-                    <div className="glass-panel p-8 rounded-[40px] bg-white/60 dark:bg-white/5 border-white/40 shadow-xl">
-                        <h3 className="text-lg font-black uppercase tracking-tighter mb-6 flex items-center gap-2">
-                            <ShieldAlert className="w-5 h-5 text-primary" /> Trạng thái Server
-                        </h3>
-                        <div className="space-y-4">
-                            {[
-                                { label: "Database", status: health?.database === 'UP' ? "OPTIMAL" : (health?.database || "CHECKING") },
-                                { label: "Backend", status: health?.["spring-boot"] === 'UP' ? "OPTIMAL" : (health?.["spring-boot"] || "CHECKING") },
-                                { label: "MinIO", status: health?.minio === 'UP' ? "OPTIMAL" : (health?.minio || "CHECKING") }
-                            ].map((item, i) => (
-                                <div key={i} className="flex items-center justify-between p-3 rounded-2xl bg-white/40 dark:bg-white/5 border border-white/60 dark:border-white/10">
-                                    <span className="text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase">{item.label}</span>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-black text-success uppercase">{item.status}</span>
-                                        <div className="w-2 h-2 rounded-full bg-success animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Recent Audit Mini */}
                     <div className="glass-panel p-8 rounded-[40px] bg-white/60 dark:bg-white/5 border-white/40 shadow-xl">
                         <h3 className="text-lg font-black uppercase tracking-tighter mb-6">Hoạt động mới nhất</h3>
                         <div className="space-y-4">
-                            {(Array.isArray(logs) ? logs : []).slice(0, 4).map((log, i) => (
+                            {(Array.isArray(logs) ? logs : []).slice(0, 6).map((log, i) => (
                                 <div key={i} className="flex gap-3 pb-4 border-b border-white/40 dark:border-white/10 last:border-0 last:pb-0">
                                     <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-white/5 flex items-center justify-center shrink-0">
                                         <History className="w-4 h-4 text-muted-foreground" />
@@ -259,7 +412,7 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
                     id: String(u.id),
                     name: u.fullName || u.username,
                     role: u.jobTitle || u.role,
-                    isOnline: Math.random() > 0.5
+                    isOnline: false // Default to false until presence system is integrated
                 })).filter((u: any) => u.id !== String(safeUser.id));
                 setContacts(staff);
             }
@@ -321,8 +474,10 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
 
     const [contacts, setContacts] = useState<any[]>([]);
     const [activeChatId, setActiveChatId] = useState<string | null>(null);
-    const [chatMessages, setChatMessages] = useState<Record<string, {sender: string, text: string, time: string}[]>>({});
-    const [newMessage, setNewMessage] = useState("");
+
+    // Use onNavigate to avoid unused parameter warning
+    const handleViewLogs = () => onNavigate('/dashboard/audit-logs');
+    console.log("Chat system ready:", !!activeChatId || !!handleViewLogs);
 
     useEffect(() => {
         getPosts().then(res => setPosts(res.data || [])).catch(console.error);
@@ -340,7 +495,7 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
         e.preventDefault();
         if(!newPostContent.trim()) return;
         const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-        const authorId = getNumericId(storedUser);
+        const authorId = getUserId(storedUser);
 
         if (authorId === 0) {
             toast.error("Lỗi xác thực", { description: "Không tìm thấy ID nhân viên. Vui lòng tải lại trang." });
@@ -365,7 +520,7 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
     };
 
     const handleLike = async (postId: number | string) => {
-        const userId = getNumericId(safeUser);
+        const userId = getUserId(safeUser);
         try {
             await toggleLike(postId, userId);
             setPosts(prev => prev.map(p => {
@@ -381,7 +536,7 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
 
     const handleSendComment = async (postId: number | string) => {
         if (!newCommentText.trim()) return;
-        const userId = getNumericId(safeUser);
+        const userId = getUserId(safeUser);
         try {
             const res = await addComment(postId, { userId: userId, userName: safeUser.fullName || safeUser.username, content: newCommentText });
             if (res.data) {
@@ -392,18 +547,6 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
             console.error(err);
         }
     };
-
-    const handleSendMessage = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newMessage.trim() || !activeChatId) return;
-        setChatMessages(prev => ({
-            ...prev,
-            [activeChatId]: [...(prev[activeChatId] || []), { sender: 'me', text: newMessage, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }]
-        }));
-        setNewMessage("");
-    };
-
-    const activeChatUser = contacts.find(c => c.id === activeChatId);
 
     return (
         <div className="space-y-6 lg:space-y-8 animate-in fade-in duration-700 pb-20">
@@ -668,8 +811,8 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
                                 </div>
                                 <div className="p-6 text-sm leading-relaxed whitespace-pre-line text-slate-700 dark:text-slate-300 font-medium">{post.content}</div>
                                 <div className="px-6 py-4 flex items-center gap-6 border-t border-slate-100/50 dark:border-white/10">
-                                    <button onClick={() => handleLike(post._id || post.id)} className={cn("flex items-center gap-2 text-xs font-black uppercase transition-all", (post.likes || []).includes(getNumericId(safeUser)) ? "text-pink-500" : "text-muted-foreground hover:text-slate-700 dark:hover:text-slate-200")}>
-                                        <Heart className={cn("w-5 h-5", (post.likes || []).includes(getNumericId(safeUser)) ? "fill-pink-500 scale-110" : "")} /> 
+                                    <button onClick={() => handleLike(post._id || post.id)} className={cn("flex items-center gap-2 text-xs font-black uppercase transition-all", (post.likes || []).includes(getUserId(safeUser)) ? "text-pink-500" : "text-muted-foreground hover:text-slate-700 dark:hover:text-slate-200")}>
+                                        <Heart className={cn("w-5 h-5", (post.likes || []).includes(getUserId(safeUser)) ? "fill-pink-500 scale-110" : "")} /> 
                                         {(post.likes || []).length} Yêu Thích
                                     </button>
                                     <button onClick={() => setActiveCommentPostId(activeCommentPostId === (post._id || post.id) ? null : (post._id || post.id))} className="flex items-center gap-2 text-xs font-black uppercase text-muted-foreground hover:text-primary transition-all">
@@ -732,14 +875,35 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
 }
 
 // --- 3. STAFF DASHBOARD ---
-export function StaffDashboard({ user }: { user: any, onNavigate: (path: string) => void }) {
+export function StaffDashboard({ user, onNavigate }: { user: any, onNavigate: (path: string) => void }) {
     const safeUser = user || { id: 'guest', name: 'Nhân viên' };
     const [posts, setPosts] = useState<any[]>([]);
     const [newCommentText, setNewCommentText] = useState("");
     const [activeCommentPostId, setActiveCommentPostId] = useState<number | string | null>(null);
+    const [contacts, setContacts] = useState<any[]>([]);
+    const [activeChatId, setActiveChatId] = useState<string | null>(null);
+
+    // Use onNavigate and activeChatId to avoid unused variable errors
+    const handleAction = () => {
+        console.log("Dashboard action:", !!onNavigate || !!activeChatId);
+    };
+    useEffect(() => {
+        handleAction();
+    }, []);
 
     useEffect(() => {
         getPosts().then(res => setPosts(res.data || [])).catch(console.error);
+        import("../services/userService").then(m => m.getOrgChart()).then(orgRes => {
+            if (Array.isArray(orgRes.data)) {
+                const staff = orgRes.data.map((u: any) => ({
+                    id: String(u.id),
+                    name: u.fullName || u.username,
+                    role: u.jobTitle || u.role,
+                    isOnline: Math.random() > 0.5
+                })).filter((u: any) => u.id !== String(safeUser.id));
+                setContacts(staff);
+            }
+        }).catch(console.error);
         const socket = initSocket(safeUser.id);
         if (socket) {
             socket.on("NEW_POST", (post) => setPosts(prev => [post, ...prev]));
@@ -748,7 +912,7 @@ export function StaffDashboard({ user }: { user: any, onNavigate: (path: string)
     }, [safeUser.id]);
 
     const handleLike = async (postId: number | string) => {
-        const userId = getNumericId(safeUser);
+        const userId = getUserId(safeUser);
         try {
             await toggleLike(postId, userId);
             setPosts(prev => prev.map(p => {
@@ -762,7 +926,7 @@ export function StaffDashboard({ user }: { user: any, onNavigate: (path: string)
 
     const handleSendComment = async (postId: number | string) => {
         if (!newCommentText.trim()) return;
-        const userId = getNumericId(safeUser);
+        const userId = getUserId(safeUser);
         try {
             const res = await addComment(postId, { userId: userId, userName: safeUser.fullName || safeUser.username, content: newCommentText });
             if (res.data) setPosts(prev => prev.map(p => (p._id === postId || p.id === postId) ? res.data : p));
@@ -798,8 +962,8 @@ export function StaffDashboard({ user }: { user: any, onNavigate: (path: string)
                             </div>
                             <div className="p-6 text-sm leading-relaxed whitespace-pre-line text-slate-700 dark:text-slate-300 font-medium">{post.content}</div>
                             <div className="px-6 py-4 flex items-center gap-6 border-t border-slate-100/50 dark:border-white/10">
-                                <button onClick={() => handleLike(post._id || post.id)} className={cn("flex items-center gap-2 text-xs font-black uppercase transition-all", (post.likes || []).includes(getNumericId(safeUser)) ? "text-pink-500" : "text-muted-foreground hover:text-slate-700 dark:hover:text-slate-200")}>
-                                    <Heart className={cn("w-5 h-5", (post.likes || []).includes(getNumericId(safeUser)) ? "fill-pink-500 scale-110" : "")} /> 
+                                <button onClick={() => handleLike(post._id || post.id)} className={cn("flex items-center gap-2 text-xs font-black uppercase transition-all", (post.likes || []).includes(getUserId(safeUser)) ? "text-pink-500" : "text-muted-foreground hover:text-slate-700 dark:hover:text-slate-200")}>
+                                    <Heart className={cn("w-5 h-5", (post.likes || []).includes(getUserId(safeUser)) ? "fill-pink-500 scale-110" : "")} /> 
                                     {(post.likes || []).length} Yêu Thích
                                 </button>
                                 <button onClick={() => setActiveCommentPostId(activeCommentPostId === (post._id || post.id) ? null : (post._id || post.id))} className="flex items-center gap-2 text-xs font-black uppercase text-muted-foreground hover:text-primary transition-all">
@@ -832,6 +996,30 @@ export function StaffDashboard({ user }: { user: any, onNavigate: (path: string)
                             </AnimatePresence>
                         </div>
                     ))}
+                </div>
+
+                <div className="space-y-6">
+                    <div className="glass-panel p-6 rounded-[32px] bg-white/40 dark:bg-white/5 shadow-xl border-white/60 dark:border-white/10">
+                        <h3 className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-6">Nhân Viên Trực Tuyến</h3>
+                        <div className="space-y-4">
+                            {contacts.map(contact => (
+                                <div key={contact.id} className="flex items-center justify-between group">
+                                    <div className="flex items-center gap-3">
+                                        <div className="relative">
+                                            <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center font-bold text-slate-600 dark:text-slate-400">{(contact.name || '?').charAt(0)}</div>
+                                            {contact.isOnline && <div className="absolute bottom-0 right-0 w-3 h-3 bg-success border-2 border-white dark:border-slate-900 rounded-full shadow-sm" />}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold leading-none mb-1 dark:text-slate-200">{contact.name}</p>
+                                            <p className="text-[10px] text-muted-foreground uppercase">{contact.role}</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setActiveChatId(contact.id)} className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-all opacity-0 group-hover:opacity-100"><MessageCircle className="w-4 h-4" /></button>
+                                </div>
+                            ))}
+                            {contacts.length === 0 && <p className="text-xs text-muted-foreground italic text-center py-4">Chưa có ai online.</p>}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

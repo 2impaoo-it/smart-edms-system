@@ -23,4 +23,6 @@ export const getAllKeystores = () => axiosClient.get("/users/keystore");
 
 export const resetUserKeystore = (id: string | number) => axiosClient.put(`/users/${id}/keystore/reset`);
 
-export const toggleUserStatus = (id: string | number) => axiosClient.put(`/users/${id}/status`);
+export const toggleUserStatus = (id: string | number, isActive: boolean) => axiosClient.put(`/users/${id}/status`, null, { params: { isActive } });
+
+export const updateUserJobTitle = (id: string | number, jobTitle: string) => axiosClient.put(`/users/${id}/job-title`, { jobTitle });

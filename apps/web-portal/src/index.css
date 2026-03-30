@@ -57,6 +57,9 @@
       radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.05), transparent 40%);
     background-attachment: fixed;
   }
+  input, textarea, select {
+    @apply dark:text-slate-200 dark:placeholder-slate-500;
+  }
 }
 
 @layer utilities {

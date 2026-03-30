@@ -12,6 +12,7 @@ import { Settings } from "../../pages/Settings";
 import { RecycleBin } from "../../pages/RecycleBin";
 import { SignatureManagement } from "../../pages/SignatureManagement";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
+import { gooeyToast as toast } from "goey-toast";
 
 export interface AppNotification {
     id: string;
@@ -57,11 +58,14 @@ export function MainLayout() {
         import("../../services/userService").then(m => m.getOrgChart()).then(res => {
             if (Array.isArray(res.data)) {
                 const fullInfo = res.data.find((u: any) => u.username === currentUser.username || u.username === currentUser.id);
-                if (fullInfo && String(fullInfo.id) !== String(currentUser.id)) {
+                if (fullInfo) {
                     const updated = { ...currentUser, ...fullInfo };
-                    localStorage.setItem('user', JSON.stringify(updated));
-                    setCurrentUser(updated);
-                    window.dispatchEvent(new Event('user-updated'));
+                    // Avoid redundant re-renders and localStorage writes if nothing changed
+                    if (JSON.stringify(updated) !== JSON.stringify(currentUser)) {
+                        localStorage.setItem('user', JSON.stringify(updated));
+                        setCurrentUser(updated);
+                        window.dispatchEvent(new Event('user-updated'));
+                    }
                 }
             }
         }).catch(console.error);
