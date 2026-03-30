@@ -255,8 +255,8 @@ export function Sidebar({ role, user, notifications }: SidebarProps) {
                         <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full z-10"></div>
                     </div>
                     <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{user?.name || "Người dùng"}</h4>
-                        <p className="text-[10px] font-black text-primary uppercase tracking-widest truncate">{user?.role === 'ADMIN' ? 'Quản trị viên' : user?.role === 'MANAGER' ? 'Trưởng phòng' : 'Nhân viên'}</p>
+                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{user?.fullName || user?.name || user?.username || "Người dùng"}</h4>
+                        <p className="text-[10px] font-black text-primary uppercase tracking-widest truncate">{user?.jobTitle || (user?.role === 'ADMIN' ? 'Quản trị viên' : user?.role === 'MANAGER' ? 'Trưởng phòng' : 'Nhân viên')}</p>
                     </div>
                     <Link to="/dashboard/settings" className="p-2 rounded-xl text-muted-foreground hover:text-primary hover:bg-white/60 dark:hover:bg-white/10 transition-all shrink-0" title="Cài đặt">
                         <Settings className="w-4 h-4" />
