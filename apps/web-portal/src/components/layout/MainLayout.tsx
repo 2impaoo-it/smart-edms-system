@@ -28,10 +28,19 @@ export function MainLayout() {
     const [searchParams, setSearchParams] = useSearchParams();
 
     // Lấy thông tin user từ localStorage, đã được kiểm tra ở ProtectedRoute
-    const [currentUser] = useState<any>(() => {
+    const [currentUser, setCurrentUser] = useState<any>(() => {
         const stored = localStorage.getItem('user');
         return stored ? JSON.parse(stored) : null; 
     });
+
+    useEffect(() => {
+        const handleUserUpdate = () => {
+            const stored = localStorage.getItem('user');
+            if (stored) setCurrentUser(JSON.parse(stored));
+        };
+        window.addEventListener('user-updated', handleUserUpdate);
+        return () => window.removeEventListener('user-updated', handleUserUpdate);
+    }, []);
 
     const currentRole: UserRole = currentUser?.role || 'STAFF';
     

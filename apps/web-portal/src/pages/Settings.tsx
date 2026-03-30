@@ -28,7 +28,7 @@ export const Settings = () => {
         if (userData) {
             const parsed = JSON.parse(userData);
             setUser(parsed);
-            setEditName(parsed.name || parsed.username || '');
+            setEditName(parsed.fullName || parsed.name || parsed.username || '');
             setEditEmail(parsed.email || '');
         }
     }, []);
@@ -43,16 +43,23 @@ export const Settings = () => {
         }
         try {
             setIsGenerating(true);
-            const commonName = user?.name || user?.username || "Manager";
+            const commonName = user?.fullName || user?.name || user?.username || "Manager";
             const blob = await generateKeystore(commonName, keystorePassword);
+            
+            // Update local status
+            const updatedUser = { ...user, hasKeystore: true };
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+            setUser(updatedUser);
+            window.dispatchEvent(new Event('user-updated'));
+
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', 'keystore.p12');
+            link.setAttribute('download', `${commonName.replace(/\s+/g, '_')}_signature.p12`);
             document.body.appendChild(link);
             link.click();
             link.remove();
-            toast.success("Khởi tạo thành công", { description: "Đã tải xuống khóa riêng tư (keystore.p12). Hãy cất giữ cẩn thận!" });
+            toast.success("Khởi tạo thành công", { description: "Đã tải xuống khóa riêng tư (.p12). Hãy cất giữ cẩn thận!" });
             setKeystorePassword('');
         } catch (error) {
             console.error(error);
@@ -71,9 +78,10 @@ export const Settings = () => {
         setIsSavingProfile(true);
         try {
             // Update localStorage with new profile
-            const updatedUser = { ...user, name: editName.trim(), email: editEmail.trim() };
+            const updatedUser = { ...user, fullName: editName.trim(), email: editEmail.trim() };
             localStorage.setItem('user', JSON.stringify(updatedUser));
             setUser(updatedUser);
+            window.dispatchEvent(new Event('user-updated'));
             toast.success("Cập nhật hồ sơ", { description: "Thông tin cá nhân đã được lưu thành công." });
         } catch {
             toast.error("Lỗi", { description: "Không thể cập nhật hồ sơ." });
@@ -119,7 +127,7 @@ export const Settings = () => {
     return (
         <div className="space-y-6 lg:space-y-8 animate-in fade-in duration-700 pb-20">
             {/* HEADER */}
-            <div className="flex justify-between items-start">
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                 <div>
                     <h2 className="text-3xl font-black tracking-tighter uppercase italic gradient-text flex items-center gap-3">
                         {isAdmin ? <Server className="w-8 h-8 text-primary" /> : <User className="w-8 h-8 text-primary" />}
@@ -146,9 +154,9 @@ export const Settings = () => {
             {/* ═══ PROFILE SECTION ═══ */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 {/* Profile Info Card */}
-                <div className="glass-panel rounded-[32px] border border-white/20 bg-white/40 overflow-hidden">
-                    <div className="p-6 bg-white/40 border-b border-white/40">
-                        <h3 className="font-bold flex items-center gap-2"><UserCircle className="w-5 h-5 text-primary" /> Thông tin cá nhân</h3>
+                <div className="glass-panel rounded-[32px] border border-white/20 dark:border-white/10 bg-white/40 dark:bg-white/5 overflow-hidden">
+                    <div className="p-6 bg-white/40 dark:bg-white/5 border-b border-white/40 dark:border-white/10">
+                        <h3 className="font-bold flex items-center gap-2 dark:text-white"><UserCircle className="w-5 h-5 text-primary" /> Thông tin cá nhân</h3>
                     </div>
                     <div className="p-6 space-y-5">
                         {/* Avatar */}
@@ -162,7 +170,7 @@ export const Settings = () => {
                                 </div>
                             </div>
                             <div>
-                                <p className="font-bold text-lg">{user?.name || user?.username || 'Người dùng'}</p>
+                                <p className="font-bold text-lg dark:text-white">{user?.fullName || user?.name || user?.username || 'Người dùng'}</p>
                                 <span className={cn(
                                     "px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest",
                                     user?.role === 'ADMIN' ? 'bg-destructive/10 text-destructive' :
@@ -175,21 +183,21 @@ export const Settings = () => {
 
                         <div className="space-y-4">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Tên hiển thị</label>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Tên hiển thị</label>
                                 <input
                                     type="text"
                                     value={editName}
                                     onChange={e => setEditName(e.target.value)}
-                                    className="w-full bg-white/50 border border-white/60 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full bg-white/50 dark:bg-slate-900/50 border border-white/60 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 dark:text-white"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1"><Mail className="w-3 h-3" /> Email</label>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1 ml-1"><Mail className="w-3 h-3" /> Email</label>
                                 <input
                                     type="email"
                                     value={editEmail}
                                     onChange={e => setEditEmail(e.target.value)}
-                                    className="w-full bg-white/50 border border-white/60 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full bg-white/50 dark:bg-slate-900/50 border border-white/60 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 dark:text-white"
                                 />
                             </div>
                         </div>
@@ -205,41 +213,41 @@ export const Settings = () => {
                 </div>
 
                 {/* Password Change Card */}
-                <div className="glass-panel rounded-[32px] border border-white/20 bg-white/40 overflow-hidden">
-                    <div className="p-6 bg-white/40 border-b border-white/40">
-                        <h3 className="font-bold flex items-center gap-2"><Lock className="w-5 h-5 text-amber-500" /> Đổi mật khẩu</h3>
+                <div className="glass-panel rounded-[32px] border border-white/20 dark:border-white/10 bg-white/40 dark:bg-white/5 overflow-hidden">
+                    <div className="p-6 bg-white/40 dark:bg-white/5 border-b border-white/40 dark:border-white/10">
+                        <h3 className="font-bold flex items-center gap-2 dark:text-white"><Lock className="w-5 h-5 text-amber-500" /> Đổi mật khẩu</h3>
                     </div>
                     <div className="p-6 space-y-5">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Mật khẩu hiện tại</label>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Mật khẩu hiện tại</label>
                             <input
                                 type="password"
                                 value={currentPass}
                                 onChange={e => setCurrentPass(e.target.value)}
                                 placeholder="Nhập mật khẩu cũ..."
-                                className="w-full bg-white/50 border border-white/60 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                className="w-full bg-white/50 dark:bg-slate-900/50 border border-white/60 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 dark:text-white"
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Mật khẩu mới</label>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Mật khẩu mới</label>
                             <input
                                 type="password"
                                 value={newPass}
                                 onChange={e => setNewPass(e.target.value)}
                                 placeholder="Tối thiểu 6 ký tự..."
-                                className="w-full bg-white/50 border border-white/60 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                className="w-full bg-white/50 dark:bg-slate-900/50 border border-white/60 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 dark:text-white"
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Xác nhận mật khẩu mới</label>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Xác nhận mật khẩu mới</label>
                             <input
                                 type="password"
                                 value={confirmPass}
                                 onChange={e => setConfirmPass(e.target.value)}
                                 placeholder="Nhập lại mật khẩu mới..."
                                 className={cn(
-                                    "w-full bg-white/50 border rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20",
-                                    confirmPass && confirmPass !== newPass ? "border-destructive" : "border-white/60"
+                                    "w-full bg-white/50 dark:bg-slate-900/50 border rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 dark:text-white",
+                                    confirmPass && confirmPass !== newPass ? "border-destructive" : "border-white/60 dark:border-white/10"
                                 )}
                             />
                             {confirmPass && confirmPass !== newPass && (
@@ -258,130 +266,22 @@ export const Settings = () => {
                 </div>
             </div>
 
-            {/* ═══ ADMIN INFRASTRUCTURE DASHBOARD ═══ */}
-            {isAdmin && (
-                <>
-                    <div className="pt-4">
-                        <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2 mb-6">
-                            <Shield className="w-5 h-5 text-primary" /> Quản trị Hệ thống & Bảo mật
-                        </h3>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {/* PostgreSQL */}
-                        <div className="glass-panel p-5 rounded-[28px] bg-white/40 shadow-sm hover:shadow-lg transition-all border-l-4 border-l-blue-500">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center"><Database className="w-5 h-5" /></div>
-                                <div>
-                                    <h4 className="font-bold text-sm">PostgreSQL Cluster</h4>
-                                    <p className="text-[10px] text-muted-foreground font-bold">Relational Database</p>
-                                </div>
-                                <div className="ml-auto flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /><span className="text-[9px] font-black text-emerald-600 uppercase">Stable</span></div>
-                            </div>
-                            <div className="space-y-2 text-xs">
-                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Uptime</span><span className="font-bold text-success">99.99%</span></div>
-                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Connections</span><span className="font-bold">12 / 100</span></div>
-                            </div>
-                        </div>
-
-                        {/* MinIO */}
-                        <div className="glass-panel p-5 rounded-[28px] bg-white/40 shadow-sm hover:shadow-lg transition-all border-l-4 border-l-orange-500">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center"><HardDrive className="w-5 h-5" /></div>
-                                <div>
-                                    <h4 className="font-bold text-sm">MinIO S3 Storage</h4>
-                                    <p className="text-[10px] text-muted-foreground font-bold">Object-based Storage</p>
-                                </div>
-                                <div className="ml-auto flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /><span className="text-[9px] font-black text-emerald-600 uppercase">Ready</span></div>
-                            </div>
-                            <div className="space-y-2 text-xs">
-                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Policy</span><span className="font-bold">Private-ACL</span></div>
-                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Region</span><span className="font-bold uppercase">vn-east-1</span></div>
-                            </div>
-                        </div>
-
-                        {/* Kafka */}
-                        <div className="glass-panel p-5 rounded-[28px] bg-white/40 shadow-sm hover:shadow-lg transition-all border-l-4 border-l-violet-500">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center"><Wifi className="w-5 h-5" /></div>
-                                <div>
-                                    <h4 className="font-bold text-sm">Apache Kafka</h4>
-                                    <p className="text-[10px] text-muted-foreground font-bold">Event Log Pipeline</p>
-                                </div>
-                                <div className="ml-auto flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /><span className="text-[9px] font-black text-emerald-600 uppercase">Syncing</span></div>
-                            </div>
-                            <div className="space-y-2 text-xs">
-                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Topic Count</span><span className="font-bold">8 Active</span></div>
-                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Consumer</span><span className="font-bold">Audit-Service</span></div>
-                            </div>
-                        </div>
-
-                        {/* Security */}
-                        <div className="glass-panel p-5 rounded-[28px] bg-white/40 shadow-sm hover:shadow-lg transition-all border-l-4 border-l-emerald-500">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center"><Shield className="w-5 h-5" /></div>
-                                <div>
-                                    <h4 className="font-bold text-sm">Security Layer</h4>
-                                    <p className="text-[10px] text-muted-foreground font-bold">Auth & Encryption</p>
-                                </div>
-                                <div className="ml-auto flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /><span className="text-[9px] font-black text-emerald-600 uppercase">High</span></div>
-                            </div>
-                            <div className="space-y-2 text-xs">
-                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">JWT TTL</span><span className="font-bold">24 Hours</span></div>
-                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Crypto</span><span className="font-bold uppercase">RSA-4096</span></div>
-                            </div>
-                        </div>
-
-                        {/* Backup */}
-                        <div className="glass-panel p-5 rounded-[28px] bg-white/40 shadow-sm hover:shadow-lg transition-all border-l-4 border-l-pink-500">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center"><Save className="w-5 h-5" /></div>
-                                <div>
-                                    <h4 className="font-bold text-sm">System Backup</h4>
-                                    <p className="text-[10px] text-muted-foreground font-bold">Scheduled Tasks</p>
-                                </div>
-                                <div className="ml-auto flex items-center gap-1.5"><span className="text-[9px] font-black text-slate-500 uppercase">Idle</span></div>
-                            </div>
-                            <div className="space-y-2 text-xs">
-                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Last Sync</span><span className="font-bold">04:00 AM Today</span></div>
-                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Storage</span><span className="font-bold">Off-site</span></div>
-                            </div>
-                        </div>
-
-                        {/* Logs */}
-                        <div className="glass-panel p-5 rounded-[28px] bg-white/40 shadow-sm hover:shadow-lg transition-all border-l-4 border-l-cyan-500">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-600 flex items-center justify-center"><Mail className="w-5 h-5" /></div>
-                                <div>
-                                    <h4 className="font-bold text-sm">Logging System</h4>
-                                    <p className="text-[10px] text-muted-foreground font-bold">Elastic / Audit</p>
-                                </div>
-                                <div className="ml-auto flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /><span className="text-[9px] font-black text-emerald-600 uppercase">Active</span></div>
-                            </div>
-                            <div className="space-y-2 text-xs">
-                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Logs/Min</span><span className="font-bold">~45 events</span></div>
-                                <div className="flex justify-between"><span className="text-muted-foreground font-medium">Retention</span><span className="font-bold">90 Days</span></div>
-                            </div>
-                        </div>
-                    </div>
-                </>
-            )}
-
             {/* ═══ KEYSTORE GENERATOR (MANAGER ONLY) ═══ */}
-            {user?.role === 'MANAGER' && (
-                <div className="glass-panel p-6 rounded-[32px] border border-white/20 bg-white/40 relative overflow-hidden">
+            {user?.role === 'MANAGER' && !user?.hasKeystore && (
+                <div className="glass-panel p-6 rounded-[32px] border border-white/20 dark:border-white/10 bg-white/40 dark:bg-white/5 relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-1.5 h-full bg-red-500 rounded-l-[32px]"></div>
                     <div className="flex items-start gap-4">
                         <div className="p-3 bg-red-500/10 text-red-500 rounded-xl shrink-0">
                             <ShieldAlert className="w-6 h-6" />
                         </div>
                         <div className="flex-1">
-                            <h3 className="text-lg font-bold mb-2">Khởi tạo Chứng thư số cá nhân</h3>
-                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl mb-6">
+                            <h3 className="text-lg font-bold mb-2 dark:text-white">Khởi tạo Chứng thư số cá nhân</h3>
+                            <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/20 rounded-xl mb-6">
                                 <div className="flex items-start gap-3">
                                     <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                                     <div>
-                                        <h4 className="font-bold text-amber-800 text-sm mb-1">CẢNH BÁO BẢO MẬT:</h4>
-                                        <p className="text-xs text-amber-700 leading-relaxed font-medium">
+                                        <h4 className="font-bold text-amber-800 dark:text-amber-400 text-sm mb-1">CẢNH BÁO BẢO MẬT:</h4>
+                                        <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed font-medium">
                                             Hệ thống <strong>KHÔNG</strong> lưu trữ mật khẩu cấp 2 và file Khóa bí mật (.p12). 
                                             Hãy tải về, lưu trữ an toàn và <strong>TUYỆT ĐỐI KHÔNG CHIA SẺ</strong>.
                                         </p>
@@ -391,7 +291,7 @@ export const Settings = () => {
 
                             <div className="space-y-4 max-w-sm">
                                 <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-500 uppercase">Mật khẩu bảo vệ Khóa (Passphrase)</label>
+                                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase ml-1">Mật khẩu bảo vệ Khóa (Passphrase)</label>
                                     <div className="relative">
                                         <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                                         <input 
@@ -399,7 +299,7 @@ export const Settings = () => {
                                             value={keystorePassword}
                                             onChange={(e) => setKeystorePassword(e.target.value)}
                                             placeholder="Nhập tối thiểu 6 ký tự..."
-                                            className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-sm transition-all"
+                                            className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-slate-900/50 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-sm transition-all dark:text-white"
                                         />
                                     </div>
                                 </div>
@@ -407,7 +307,7 @@ export const Settings = () => {
                                 <button 
                                     onClick={handleGenerateKeystore}
                                     disabled={isGenerating}
-                                    className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white h-11 rounded-xl font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-full flex items-center justify-center gap-2 bg-slate-900 dark:bg-white/10 hover:bg-slate-800 dark:hover:bg-white/20 text-white h-11 rounded-xl font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {isGenerating ? (
                                         <span className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
