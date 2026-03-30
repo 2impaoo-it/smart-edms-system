@@ -185,12 +185,12 @@ public class CategoryService {
 
         return category;
     }
-
+    @Transactional
     public Category rename(Long id, CategoryRequestDTO dto, Long userId) {
         Category category = folderRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Thư mục không tồn tại: " + id));
 
-        if (!permissionService.hasMinimumPermission(userId, id, PermissionLevel.EDITOR)) {
+        if (!userId.equals(category.getOwnerId()) && !permissionService.hasMinimumPermission(userId, id, PermissionLevel.EDITOR)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền đổi tên thư mục này");
         }
 

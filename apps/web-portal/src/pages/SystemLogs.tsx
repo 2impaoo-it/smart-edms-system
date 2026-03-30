@@ -185,8 +185,8 @@ export function SystemLogs() {
                           bởi <strong className="text-slate-700">{log.actorName || log.performedBy || log.userId || '—'}</strong>
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground truncate" title={log.details}>
-                        {log.details || log.description || 'Không có mô tả chi tiết'}
+                      <p className="text-xs text-muted-foreground truncate" title={typeof log.details === 'string' ? log.details : JSON.stringify(log.details)}>
+                        {typeof log.details === 'object' ? JSON.stringify(log.details) : (log.details || log.description || 'Không có mô tả chi tiết')}
                       </p>
                     </div>
                     <div className="text-right shrink-0">

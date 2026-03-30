@@ -75,6 +75,7 @@ public class DocumentService {
         return documentRepository.findByFolderIdAndIsDeletedFalse(folderId);
     }
 
+    @Transactional
     public void softDelete(Long id) {
         Document document = documentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));

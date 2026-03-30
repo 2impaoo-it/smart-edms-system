@@ -31,12 +31,20 @@ public class AuditProxyController {
     @GetMapping("/logs")
     @Operation(summary = "Lấy log hệ thống", description = "Gửi request proxy qua Node.js service ở cổng 3000")
     public ResponseEntity<String> getAuditLogs(
+            @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer limit,
-            @RequestParam(required = false) String action) {
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) String actorName,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
 
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(AUDIT_SERVICE_URL);
+        if (page != null) builder.queryParam("page", page);
         if (limit != null) builder.queryParam("limit", limit);
         if (action != null) builder.queryParam("action", action);
+        if (actorName != null) builder.queryParam("actorName", actorName);
+        if (startDate != null) builder.queryParam("startDate", startDate);
+        if (endDate != null) builder.queryParam("endDate", endDate);
 
         // Tạo header kèm x-api-key để xác thực với dịch vụ Audit
         HttpHeaders headers = new HttpHeaders();
