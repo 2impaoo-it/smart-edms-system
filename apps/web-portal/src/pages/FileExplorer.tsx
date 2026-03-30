@@ -29,7 +29,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { FileItem, User } from "../lib/types";
 import { cn } from "../lib/utils";
 import { getFolderContents, createFolder, deleteFolder, getPersonalTree, getDepartmentTree, shareFolder, renameFolder } from "../services/folderService";
-import { uploadDocument, getDocumentStreamUrl, getFolderDocuments, deleteDocument, getDocumentVersions, getDocumentVersionStreamUrl, uploadNewDocumentVersion, signDocument, submitForApproval, rejectDocument, approveDocument } from "../services/documentService";
+import { uploadDocument, getDocumentStreamUrl, getFolderDocuments, deleteDocument, getDocumentVersions, getDocumentVersionStreamUrl, uploadNewDocumentVersion, signDocument, submitForApproval, rejectDocument, approveDocument, renameDocument } from "../services/documentService";
 import { getOrgChart } from "../services/userService";
 
 interface FileExplorerProps {
@@ -442,8 +442,8 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                 await renameFolder(rawId, renameItemName.trim());
                 toast.success("Đổi tên thành công", { description: `Thư mục đổi thành: ${renameItemName}` });
             } else {
-                toast.error("Chưa hỗ trợ", { description: "Tính năng đổi tên tài liệu (Document) đang được phát triển." });
-                return;
+                await renameDocument(rawId, renameItemName.trim());
+                toast.success("Đổi tên thành công", { description: `Tài liệu đổi thành: ${renameItemName}` });
             }
             setShowRenameModal(false);
             fetchFilesAndFolders();

@@ -65,7 +65,7 @@ public class CategoryService {
         }
 
         // Document ở root level (không thuộc folder nào)
-        documentRepository.findByFolderIdAndIsDeletedFalse(null)
+        documentRepository.findByFolderIdAndCreatedByAndIsDeletedFalse(null, userId)
                 .forEach(doc -> tree.add(toDocumentNode(doc)));
 
         return tree;
