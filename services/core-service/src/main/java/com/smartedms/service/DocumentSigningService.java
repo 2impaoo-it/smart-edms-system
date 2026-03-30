@@ -123,6 +123,105 @@ public class DocumentSigningService {
         }
     }
 
+    @Transactional
+    public DocumentVersion visualSignDocument(Long documentId, Long userId, com.smartedms.dto.VisualSignRequest request) {
+        Document document = documentRepository.findById(documentId)
+                .filter(existing -> !existing.isDeleted())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+
+        DocumentVersion currentVersion = documentVersionRepository.findByDocumentIdAndIsCurrentTrue(documentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document version not found"));
+
+        if (document.getStatus() != com.smartedms.entity.DocumentStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tài liệu không ở trạng thái chờ duyệt");
+        }
+
+        if (!userId.equals(document.getApproverId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không phải là người được chỉ định phê duyệt tài liệu này");
+        }
+
+        try {
+            // Fetch V1
+            String filePath = currentVersion.getFilePath();
+            String objectKey = filePath.substring(filePath.indexOf("/") + 1);
+            InputStream pdfStream = minioClient.getObject(
+                    GetObjectArgs.builder()
+                            .bucket(defaultBucket)
+                            .object(objectKey)
+                            .build());
+
+            byte[] pdfBytes = pdfStream.readAllBytes();
+            byte[] signedPdfBytes;
+
+            try (org.apache.pdfbox.pdmodel.PDDocument pdDoc = org.apache.pdfbox.pdmodel.PDDocument.load(pdfBytes)) {
+                int pageIdx = request.getPageNumber() - 1;
+                if (pageIdx < 0 || pageIdx >= pdDoc.getNumberOfPages()) {
+                    pageIdx = pdDoc.getNumberOfPages() - 1;
+                }
+                org.apache.pdfbox.pdmodel.PDPage page = pdDoc.getPage(pageIdx);
+                
+                String base64Image = request.getSignatureBase64();
+                if (base64Image != null && base64Image.contains(",")) {
+                    base64Image = base64Image.split(",")[1];
+                }
+                
+                byte[] imageBytes = java.util.Base64.getDecoder().decode(base64Image);
+                org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject pdImage = 
+                        org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject.createFromByteArray(pdDoc, imageBytes, "signature");
+
+                try (org.apache.pdfbox.pdmodel.PDPageContentStream contentStream = 
+                        new org.apache.pdfbox.pdmodel.PDPageContentStream(pdDoc, page, 
+                        org.apache.pdfbox.pdmodel.PDPageContentStream.AppendMode.APPEND, true, true)) {
+                    
+                    // Convert UI Viewport Y to PDF Bottom-Left Y coordinate
+                    float pdfY = page.getMediaBox().getHeight() - request.getY() - request.getHeight();
+                    contentStream.drawImage(pdImage, request.getX(), pdfY, request.getWidth(), request.getHeight());
+                }
+                
+                java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                pdDoc.save(baos);
+                signedPdfBytes = baos.toByteArray();
+            }
+
+            // Update MinIO V2
+            String newObjectKey = buildObjectKey(document.getFolderId(), UUID.randomUUID() + "-visual-signed-" + document.getName());
+            minioClient.putObject(
+                    PutObjectArgs.builder()
+                            .bucket(defaultBucket)
+                            .object(newObjectKey)
+                            .stream(new ByteArrayInputStream(signedPdfBytes), signedPdfBytes.length, -1)
+                            .contentType(MediaType.APPLICATION_PDF_VALUE)
+                            .build());
+
+            currentVersion.setCurrent(false);
+            documentVersionRepository.save(currentVersion);
+
+            DocumentVersion newVersion = new DocumentVersion();
+            newVersion.setDocumentId(document.getId());
+            newVersion.setVersionNumber(currentVersion.getVersionNumber() + 1);
+            newVersion.setFilePath(defaultBucket + "/" + newObjectKey);
+            newVersion.setCreatedBy(userId);
+            newVersion.setCurrent(true);
+            
+            document.setStatus(com.smartedms.entity.DocumentStatus.APPROVED);
+            documentRepository.save(document);
+            
+            String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+            auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                    .actorId(userId)
+                    .actorName(username)
+                    .action("VISUAL_SIGN_DOCUMENT")
+                    .entityType("DOCUMENT")
+                    .entityId(document.getId())
+                    .details(java.util.Map.of("name", document.getName(), "action", "Phê duyệt kèm chữ ký hình ảnh"))
+                    .build());
+
+            return documentVersionRepository.save(newVersion);
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Lỗi khi chèn ảnh chữ ký: " + e.getMessage(), e);
+        }
+    }
+
     private String buildObjectKey(Long folderId, String storedFileName) {
         LocalDate today = LocalDate.now();
         String folderSegment = folderId == null ? "root" : "folder-" + folderId;
