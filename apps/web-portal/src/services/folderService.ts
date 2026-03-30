@@ -49,3 +49,22 @@ export const renameFolder = (id: string, name: string) =>
  */
 export const deleteFolder = (id: string) =>
   axiosClient.delete(`/categories/${id}`);
+
+/**
+ * Chia sẻ thư mục.
+ */
+export const shareFolder = (folderId: string, userId: number, permissionLevel: 'VIEWER' | 'EDITOR') =>
+  axiosClient.post(`/folders/${folderId}/share`, { userId, permissionLevel });
+
+/**
+ * Láy danh sách quyền của thư mục.
+ */
+export const getFolderPermissions = (folderId: string) =>
+  axiosClient.get(`/folders/${folderId}/permissions`);
+
+/**
+ * Thu hồi quyền chia sẻ thư mục.
+ */
+export const revokeFolderPermission = (folderId: string, userId: number) =>
+  axiosClient.delete(`/folders/${folderId}/share/${userId}`);
+

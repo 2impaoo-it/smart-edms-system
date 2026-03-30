@@ -88,6 +88,28 @@ public class ManagementController {
         categoryService.softDelete(id, userId);
     }
 
+    @Operation(summary = "Danh sách thư mục trong thùng rác", description = "Trả về các thư mục do user đã xóa")
+    @GetMapping("/trash")
+    public List<Category> getDeletedCategories(@AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return categoryService.getDeletedCategories(userId);
+    }
+
+    @Operation(summary = "Khôi phục thư mục", description = "Khôi phục thư mục từ thùng rác")
+    @PutMapping("/{id}/restore")
+    public Category restoreCategory(@PathVariable Long id, @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return categoryService.restoreCategory(id, userId);
+    }
+
+    @Operation(summary = "Xóa vĩnh viễn thư mục", description = "Chỉ owner mới xóa được")
+    @DeleteMapping("/{id}/hard-delete")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void hardDeleteCategory(@PathVariable Long id, @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        categoryService.hardDeleteCategory(id, userId);
+    }
+
     private Long resolveUserId(UserDetails userDetails) {
         User user = userRepository.findByUsername(userDetails.getUsername())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));

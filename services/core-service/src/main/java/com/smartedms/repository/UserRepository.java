@@ -17,4 +17,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByUsername(String username);
 
     boolean existsByEmail(String email);
+
+    @org.springframework.data.jpa.repository.Query("SELECT u FROM User u JOIN u.roles r WHERE r = :role")
+    java.util.List<User> findByRole(@org.springframework.data.repository.query.Param("role") com.smartedms.entity.Role role);
 }

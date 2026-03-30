@@ -26,17 +26,20 @@ public class CategoryService {
     private final FolderPermissionRepository permissionRepository;
     private final FolderPermissionService permissionService;
     private final UserRepository userRepository;
+    private final AuditLogPublisherService auditLogPublisherService;
 
     public CategoryService(CategoryRepository folderRepository,
                            DocumentRepository documentRepository,
                            FolderPermissionRepository permissionRepository,
                            FolderPermissionService permissionService,
-                           UserRepository userRepository) {
+                           UserRepository userRepository,
+                           AuditLogPublisherService auditLogPublisherService) {
         this.folderRepository = folderRepository;
         this.documentRepository = documentRepository;
         this.permissionRepository = permissionRepository;
         this.permissionService = permissionService;
         this.userRepository = userRepository;
+        this.auditLogPublisherService = auditLogPublisherService;
     }
 
     /**
@@ -109,9 +112,20 @@ public class CategoryService {
                 // Tài liệu cá nhân: chỉ lấy folder do user sở hữu
                 return folderRepository.findByParentIdAndOwnerIdAndFolderTypeAndIsDeletedFalse(parentId, ownerId, type);
             }
+            if (ownerId != null && type == FolderType.DEPARTMENT) {
+                // Lọc thư mục phòng ban: user là owner HOẶC có quyền truy cập
+                List<Category> allDepts = folderRepository.findByParentIdAndFolderTypeAndIsDeletedFalse(parentId, type);
+                return allDepts.stream()
+                        .filter(cat -> objEquals(cat.getOwnerId(), ownerId) || permissionService.hasPermission(ownerId, cat.getId()))
+                        .collect(Collectors.toList());
+            }
             return folderRepository.findByParentIdAndFolderTypeAndIsDeletedFalse(parentId, type);
         }
         return folderRepository.findByParentIdAndIsDeletedFalse(parentId);
+    }
+
+    private boolean objEquals(Long a, Long b) {
+        return a != null && a.equals(b);
     }
 
     /**
@@ -151,7 +165,19 @@ public class CategoryService {
             category.setFolderType(folderType);
         }
 
-        return folderRepository.save(category);
+        category = folderRepository.save(category);
+
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorId(userId)
+                .actorName(username)
+                .action("CREATE_CATEGORY")
+                .entityType("CATEGORY")
+                .entityId(category.getId())
+                .details(java.util.Map.of("name", category.getName(), "folderType", category.getFolderType().name()))
+                .build());
+
+        return category;
     }
 
     public Category rename(Long id, CategoryRequestDTO dto, Long userId) {
@@ -163,7 +189,19 @@ public class CategoryService {
         }
 
         category.setName(dto.getName());
-        return folderRepository.save(category);
+        category = folderRepository.save(category);
+
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorId(userId)
+                .actorName(username)
+                .action("RENAME_CATEGORY")
+                .entityType("CATEGORY")
+                .entityId(category.getId())
+                .details(java.util.Map.of("newName", category.getName()))
+                .build());
+
+        return category;
     }
 
     @Transactional
@@ -177,6 +215,71 @@ public class CategoryService {
         }
 
         softDeleteRecursive(category);
+
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorId(userId)
+                .actorName(username)
+                .action("DELETE_CATEGORY")
+                .entityType("CATEGORY")
+                .entityId(category.getId())
+                .details(java.util.Map.of("name", category.getName()))
+                .build());
+    }
+
+    public List<Category> getDeletedCategories(Long userId) {
+        return folderRepository.findByOwnerIdAndIsDeletedTrue(userId);
+    }
+
+    @Transactional
+    public Category restoreCategory(Long id, Long userId) {
+        Category category = folderRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Thư mục không tồn tại: " + id));
+
+        if (!userId.equals(category.getOwnerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ owner mới được khôi phục");
+        }
+        if (!category.isDeleted()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Thư mục không nằm trong thùng rác");
+        }
+
+        category.setDeleted(false);
+        category = folderRepository.save(category);
+
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorId(userId)
+                .actorName(username)
+                .action("RESTORE_CATEGORY")
+                .entityType("CATEGORY")
+                .entityId(category.getId())
+                .build());
+
+        return category;
+    }
+
+    @Transactional
+    public void hardDeleteCategory(Long id, Long userId) {
+        Category category = folderRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Thư mục không tồn tại: " + id));
+
+        if (!userId.equals(category.getOwnerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ owner mới được xóa vĩnh viễn");
+        }
+        if (!category.isDeleted()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vui lòng xóa mềm trước khi xóa vĩnh viễn");
+        }
+
+        folderRepository.delete(category);
+
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorId(userId)
+                .actorName(username)
+                .action("HARD_DELETE_CATEGORY")
+                .entityType("CATEGORY")
+                .entityId(category.getId())
+                .build());
     }
 
     /**

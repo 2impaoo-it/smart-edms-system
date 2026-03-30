@@ -11,8 +11,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.List;
 
 @Service
 public class UserManagementService {
@@ -21,13 +24,17 @@ public class UserManagementService {
     private final PasswordEncoder passwordEncoder;
     private final String defaultPassword;
 
+    private final AuditLogPublisherService auditLogPublisherService;
+
     public UserManagementService(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            @Value("${app.user.default-password}") String defaultPassword) {
+            @Value("${app.user.default-password}") String defaultPassword,
+            AuditLogPublisherService auditLogPublisherService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.defaultPassword = defaultPassword;
+        this.auditLogPublisherService = auditLogPublisherService;
     }
 
     @Transactional
@@ -55,11 +62,27 @@ public class UserManagementService {
         user.setEmail(email);
         user.setFullName(fullName);
         user.setPhoneNumber(request.getPhoneNumber());
+        user.setJobTitle(request.getJobTitle());
         user.setPassword(passwordEncoder.encode(defaultPassword.trim()));
         user.setMustChangePassword(true);
         user.setRoles(resolveRoles(roleValue));
 
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        String adminUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User adminUser = userRepository.findByUsername(adminUsername).orElse(null);
+        Long adminId = adminUser != null ? adminUser.getId() : null;
+
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorId(adminId)
+                .actorName(adminUsername)
+                .action("CREATE_USER")
+                .entityType("USER")
+                .entityId(savedUser.getId())
+                .details(Map.of("createdUsername", savedUser.getUsername(), "role", roleValue))
+                .build());
+
+        return savedUser;
     }
 
     private Set<Role> resolveRoles(String roleValue) {
@@ -81,5 +104,53 @@ public class UserManagementService {
 
     private String normalize(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    public List<User> getAllUsers() {
+        return userRepository.findAll();
+    }
+
+    public List<User> getManagers() {
+        return userRepository.findByRole(Role.ROLE_MANAGER);
+    }
+
+    @Transactional
+    public void resetKeystoreStatus(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        user.setHasKeystore(false);
+        userRepository.save(user);
+
+        String adminUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorName(adminUsername)
+                .action("RESET_KEYSTORE")
+                .entityType("USER")
+                .entityId(user.getId())
+                .build());
+    }
+
+    @Transactional
+    public void updateUserStatus(Long userId, boolean isActive) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        user.setActive(isActive);
+        userRepository.save(user);
+
+        String adminUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorName(adminUsername)
+                .action(isActive ? "UNBAN_USER" : "BAN_USER")
+                .entityType("USER")
+                .entityId(user.getId())
+                .build());
+    }
+
+    @Transactional
+    public void updateKeystoreStatusByUsername(String username, boolean hasKeystore) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        user.setHasKeystore(hasKeystore);
+        userRepository.save(user);
     }
 }

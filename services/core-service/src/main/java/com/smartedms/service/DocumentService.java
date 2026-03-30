@@ -16,6 +16,8 @@ import io.minio.StatObjectResponse;
 import io.minio.MakeBucketArgs;
 import io.minio.errors.ErrorResponseException;
 import io.minio.errors.MinioException;
+import io.minio.messages.Item;
+import io.minio.Result;
 import io.minio.GetObjectResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
@@ -45,6 +47,7 @@ public class DocumentService {
     private final String defaultBucket;
     private final FolderPermissionService permissionService;
     private final DocumentConverterService converterService;
+    private final AuditLogPublisherService auditLogPublisherService;
 
     public DocumentService(
             CategoryRepository categoryRepository,
@@ -53,7 +56,8 @@ public class DocumentService {
             MinioClient minioClient,
             @Value("${minio.bucket}") String defaultBucket,
             FolderPermissionService permissionService,
-            DocumentConverterService converterService) {
+            DocumentConverterService converterService,
+            AuditLogPublisherService auditLogPublisherService) {
         this.categoryRepository = categoryRepository;
         this.documentRepository = documentRepository;
         this.documentVersionRepository = documentVersionRepository;
@@ -61,6 +65,7 @@ public class DocumentService {
         this.defaultBucket = defaultBucket;
         this.permissionService = permissionService;
         this.converterService = converterService;
+        this.auditLogPublisherService = auditLogPublisherService;
     }
 
     public List<Document> getByFolderId(Long folderId) {
@@ -72,6 +77,163 @@ public class DocumentService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
         document.setDeleted(true);
         documentRepository.save(document);
+
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorName(username)
+                .action("DELETE_DOCUMENT")
+                .entityType("DOCUMENT")
+                .entityId(document.getId())
+                .details(java.util.Map.of("name", document.getName()))
+                .build());
+    }
+
+    @Transactional
+    public Document restoreDocument(Long id) {
+        Document document = documentRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+        if (!document.isDeleted()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tài liệu này không nằm trong thùng rác");
+        }
+        document.setDeleted(false);
+        document = documentRepository.save(document);
+
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorName(username)
+                .action("RESTORE_DOCUMENT")
+                .entityType("DOCUMENT")
+                .entityId(document.getId())
+                .build());
+
+        return document;
+    }
+
+    @Transactional
+    public void hardDeleteDocument(Long id) {
+        Document document = documentRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+        
+        List<DocumentVersion> versions = documentVersionRepository.findByDocumentIdOrderByVersionNumberDesc(id);
+        for (DocumentVersion version : versions) {
+            try {
+                StorageLocation location = resolveLocation(version.getFilePath());
+                minioClient.removeObject(io.minio.RemoveObjectArgs.builder()
+                        .bucket(location.bucket())
+                        .object(location.objectKey())
+                        .build());
+            } catch (Exception e) {
+                System.err.println("Failed to delete file from MinIO: " + version.getFilePath());
+            }
+            documentVersionRepository.delete(version);
+        }
+        documentRepository.delete(document);
+    }
+
+    public List<Document> getDeletedDocuments() {
+        return documentRepository.findByIsDeletedTrue();
+    }
+
+    @Transactional
+    public void emptyAllTrash() {
+        List<Document> deletedDocs = documentRepository.findByIsDeletedTrue();
+        for (Document doc : deletedDocs) {
+            hardDeleteDocument(doc.getId());
+        }
+
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorName(username)
+                .action("EMPTY_ALL_TRASH")
+                .entityType("SYSTEM")
+                .entityId(0L)
+                .build());
+    }
+
+    public long getSystemStorageUsage() {
+        long totalSize = 0;
+        try {
+            Iterable<Result<Item>> results = minioClient.listObjects(
+                    io.minio.ListObjectsArgs.builder().bucket(defaultBucket).recursive(true).build());
+            for (Result<Item> result : results) {
+                totalSize += result.get().size();
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to get MinIO storage usage: " + e.getMessage());
+        }
+        return totalSize;
+    }
+
+    public org.springframework.data.domain.Page<Document> searchDocuments(String keyword, Long folderId, com.smartedms.entity.DocumentStatus status, int page, int size) {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
+        return documentRepository.searchDocuments(keyword, folderId, status, pageable);
+    }
+
+    @Transactional
+    public Document submitForApproval(Long documentId, Long approverId, Long userId) {
+        Document document = documentRepository.findById(documentId)
+                .filter(existing -> !existing.isDeleted())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+
+        if (document.getStatus() != com.smartedms.entity.DocumentStatus.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ tài liệu DRAFT mới có thể trình ký");
+        }
+
+        if (document.getFolderId() != null && !permissionService.hasMinimumPermission(userId, document.getFolderId(), PermissionLevel.EDITOR)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền trình ký tài liệu này");
+        }
+
+        document.setStatus(com.smartedms.entity.DocumentStatus.PENDING_APPROVAL);
+        document.setApproverId(approverId);
+        return documentRepository.save(document);
+    }
+
+    @Transactional
+    public Document rejectDocument(Long documentId, Long userId) {
+        Document document = documentRepository.findById(documentId)
+                .filter(existing -> !existing.isDeleted())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+
+        if (!userId.equals(document.getApproverId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ người duyệt mới có quyền từ chối");
+        }
+
+        document.setStatus(com.smartedms.entity.DocumentStatus.REJECTED);
+        return documentRepository.save(document);
+    }
+
+    @Transactional
+    public Document approveDocument(Long documentId, Long userId) {
+        Document document = documentRepository.findById(documentId)
+                .filter(existing -> !existing.isDeleted())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+
+        if (!userId.equals(document.getApproverId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ người duyệt mới có quyền phê duyệt");
+        }
+
+        if (document.getStatus() != com.smartedms.entity.DocumentStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tài liệu không ở trạng thái chờ duyệt");
+        }
+
+        document.setStatus(com.smartedms.entity.DocumentStatus.APPROVED);
+        document = documentRepository.save(document);
+
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                .actorId(userId)
+                .actorName(username)
+                .action("APPROVE_DOCUMENT")
+                .entityType("DOCUMENT")
+                .entityId(document.getId())
+                .details(java.util.Map.of("name", document.getName()))
+                .build());
+
+        return document;
+    }
+
+    public List<Document> getPendingApprovals(Long approverId) {
+        return documentRepository.findByApproverIdAndStatusAndIsDeletedFalse(approverId, com.smartedms.entity.DocumentStatus.PENDING_APPROVAL);
     }
 
     @Transactional
@@ -122,6 +284,16 @@ public class DocumentService {
             version.setCreatedBy(userId);
             version.setCurrent(true);
             documentVersionRepository.save(version);
+
+            String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+            auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                    .actorId(userId)
+                    .actorName(username)
+                    .action("UPLOAD_DOCUMENT")
+                    .entityType("DOCUMENT")
+                    .entityId(document.getId())
+                    .details(java.util.Map.of("name", document.getName(), "folderId", folderId != null ? folderId : 0))
+                    .build());
 
             return document;
         } catch (MinioException exception) {
@@ -186,7 +358,19 @@ public class DocumentService {
             newVersion.setFilePath(defaultBucket + "/" + objectKey);
             newVersion.setCreatedBy(userId);
             newVersion.setCurrent(true);
-            return documentVersionRepository.save(newVersion);
+            newVersion = documentVersionRepository.save(newVersion);
+
+            String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+            auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                    .actorId(userId)
+                    .actorName(username)
+                    .action("UPLOAD_NEW_VERSION")
+                    .entityType("DOCUMENT")
+                    .entityId(document.getId())
+                    .details(java.util.Map.of("name", document.getName(), "versionNumber", newVersion.getVersionNumber()))
+                    .build());
+
+            return newVersion;
         } catch (MinioException exception) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to upload PDF to MinIO", exception);
         } catch (ResponseStatusException exception) {

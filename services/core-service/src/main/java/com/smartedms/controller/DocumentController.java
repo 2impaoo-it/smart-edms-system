@@ -5,6 +5,7 @@ import com.smartedms.entity.DocumentVersion;
 import com.smartedms.entity.User;
 import com.smartedms.repository.UserRepository;
 import com.smartedms.service.DocumentService;
+import com.smartedms.service.DocumentSigningService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -31,10 +32,12 @@ import java.util.List;
 public class DocumentController {
 
     private final DocumentService documentService;
+    private final DocumentSigningService documentSigningService;
     private final UserRepository userRepository;
 
-    public DocumentController(DocumentService documentService, UserRepository userRepository) {
+    public DocumentController(DocumentService documentService, DocumentSigningService documentSigningService, UserRepository userRepository) {
         this.documentService = documentService;
+        this.documentSigningService = documentSigningService;
         this.userRepository = userRepository;
     }
 
@@ -118,4 +121,87 @@ public class DocumentController {
     public void delete(@PathVariable Long id) {
         documentService.softDelete(id);
     }
+
+    @PostMapping(value = "/{id}/sign", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Ký số tài liệu", description = "Đóng dấu chữ ký điện tử lên bản PDF mới nhất và tạo version mới", security = @SecurityRequirement(name = "bearerAuth"))
+    public DocumentVersion signDocument(
+            @PathVariable Long id,
+            @RequestParam("p12File") MultipartFile p12File,
+            @RequestParam("password") String password,
+            @RequestParam(value = "reason", required = false) String reason,
+            @RequestParam(value = "location", required = false) String location,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        try {
+            return documentSigningService.signDocument(id, userId, p12File.getInputStream(), password, reason, location);
+        } catch (java.io.IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File chữ ký không hợp lệ", e);
+        }
+    }
+
+    @GetMapping("/pending-approvals")
+    @Operation(summary = "Lấy danh sách tài liệu chờ duyệt", description = "Trả về các tài liệu đang ở trạng thái PENDING_APPROVAL do user hiện tại duyệt", security = @SecurityRequirement(name = "bearerAuth"))
+    public List<Document> getPendingApprovals(@AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return documentService.getPendingApprovals(userId);
+    }
+
+    @PutMapping("/{id}/submit-approval")
+    @Operation(summary = "Trình ký tài liệu", description = "Chuyển trạng thái sang PENDING_APPROVAL và chỉ định người duyệt", security = @SecurityRequirement(name = "bearerAuth"))
+    public Document submitForApproval(
+            @PathVariable Long id,
+            @RequestParam Long approverId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return documentService.submitForApproval(id, approverId, userId);
+    }
+
+    @PutMapping("/{id}/reject")
+    @Operation(summary = "Từ chối tài liệu", description = "Chuyển trạng thái sang REJECTED (chỉ dành cho người được chỉ định duyệt)", security = @SecurityRequirement(name = "bearerAuth"))
+    public Document rejectDocument(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return documentService.rejectDocument(id, userId);
+    }
+
+    @PutMapping("/{id}/approve")
+    @Operation(summary = "Phê duyệt tài liệu", description = "Người được chỉ định duyệt tài liệu (chuyển sang APPROVED)", security = @SecurityRequirement(name = "bearerAuth"))
+    public Document approveDocument(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return documentService.approveDocument(id, userId);
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "Tìm kiếm tài liệu", description = "Tìm kiếm tài liệu theo tên, thư mục, trạng thái (có phân trang)", security = @SecurityRequirement(name = "bearerAuth"))
+    public org.springframework.data.domain.Page<Document> searchDocuments(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long folderId,
+            @RequestParam(required = false) com.smartedms.entity.DocumentStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return documentService.searchDocuments(keyword, folderId, status, page, size);
+    }
+
+    @GetMapping("/trash")
+    @Operation(summary = "Danh sách tài liệu đã xóa", description = "Lấy các tài liệu trong thùng rác", security = @SecurityRequirement(name = "bearerAuth"))
+    public List<Document> getDeletedDocuments() {
+        return documentService.getDeletedDocuments();
+    }
+
+    @PutMapping("/{id}/restore")
+    @Operation(summary = "Khôi phục tài liệu", description = "Khôi phục tài liệu từ thùng rác", security = @SecurityRequirement(name = "bearerAuth"))
+    public Document restoreDocument(@PathVariable Long id) {
+        return documentService.restoreDocument(id);
+    }
+
+    @DeleteMapping("/{id}/hard-delete")
+    @Operation(summary = "Xóa vĩnh viễn tài liệu", description = "Xóa vĩnh viễn tài liệu và các file vật lý trên MinIO", security = @SecurityRequirement(name = "bearerAuth"))
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void hardDeleteDocument(@PathVariable Long id) {
+        documentService.hardDeleteDocument(id);
+    }
+
 }

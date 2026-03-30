@@ -19,6 +19,9 @@ public class CreateUserRequest {
     @Schema(description = "Số điện thoại", example = "0909123456")
     private String phoneNumber;
 
+    @Schema(description = "Chức danh", example = "Trưởng phòng IT")
+    private String jobTitle;
+
     @Schema(description = "Role tài khoản do admin chọn", example = "ROLE_USER", requiredMode = Schema.RequiredMode.REQUIRED)
     private String role;
 }

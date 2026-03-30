@@ -16,6 +16,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
@@ -41,5 +46,29 @@ public class UserManagementController {
     })
     public User createUser(@RequestBody CreateUserRequest request) {
         return userManagementService.createByAdmin(request);
+    }
+
+    @GetMapping("/org-chart")
+    @Operation(summary = "Lấy sơ đồ tổ chức", description = "Lấy danh sách tất cả user trong hệ thống.")
+    public List<User> getOrgChart() {
+        return userManagementService.getAllUsers();
+    }
+
+    @GetMapping("/keystore")
+    @Operation(summary = "Quản lý Chứng thư số", description = "Xem danh sách Manager và trạng thái khởi tạo khóa .p12 của họ.")
+    public List<User> getManagerKeystoreStatus() {
+        return userManagementService.getManagers();
+    }
+
+    @PutMapping("/{id}/keystore/reset")
+    @Operation(summary = "Reset trạng thái Chứng thư số", description = "Admin reset trạng thái để Manager tự tạo lại khóa nếu bị mất.")
+    public void resetKeystoreStatus(@PathVariable Long id) {
+        userManagementService.resetKeystoreStatus(id);
+    }
+
+    @PutMapping("/{id}/status")
+    @Operation(summary = "Khóa/Mở khóa tài khoản", description = "Đổi trạng thái tài khoản nhân viên (isActive = true/false).")
+    public void updateUserStatus(@PathVariable Long id, @RequestParam boolean isActive) {
+        userManagementService.updateUserStatus(id, isActive);
     }
 }
