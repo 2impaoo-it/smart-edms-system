@@ -1207,6 +1207,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                                             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">
                                                 Trạng thái: 
                                                 {fileToView.status === 'SIGNED' ? <span className="text-green-500 ml-1">Đã Ký Số</span> :
+                                                 fileToView.status === 'APPROVED' ? <span className="text-blue-500 ml-1">Đã Phê Duyệt</span> :
                                                  fileToView.status === 'PENDING_APPROVAL' ? <span className="text-warning ml-1">Đang chờ duyệt</span> :
                                                  fileToView.status === 'REJECTED' ? <span className="text-destructive ml-1">Từ chối thao tác</span> :
                                                  <span className="text-slate-500 ml-1">Nháp (DRAFT)</span>}
