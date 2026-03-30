@@ -3,8 +3,10 @@ package com.smartedms.controller;
 import com.smartedms.dto.LoginRequest;
 import com.smartedms.dto.FirstLoginPasswordChangeRequest;
 import com.smartedms.dto.AuthResponse;
+import com.smartedms.dto.AuditLogRequest;
 import com.smartedms.entity.User;
 import com.smartedms.repository.UserRepository;
+import com.smartedms.service.AuditLogPublisherService;
 import com.smartedms.utils.JwtUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -36,6 +38,7 @@ public class AuthController {
         private final JwtUtils jwtUtils;
         private final UserRepository userRepository;
         private final PasswordEncoder passwordEncoder;
+        private final AuditLogPublisherService auditLogPublisherService;
 
         @Operation(summary = "Đăng nhập", description = "Xác thực người dùng và trả về JWT token")
         @SecurityRequirements
@@ -60,6 +63,19 @@ public class AuthController {
                 User user = userRepository.findByUsername(authentication.getName())
                                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
                                                 "User not found"));
+
+                // Ghi audit log LOGIN – fire-and-forget, không để lỗi log cản đăng nhập
+                try {
+                        auditLogPublisherService.publishLog(AuditLogRequest.builder()
+                                        .actorId(user.getId())
+                                        .actorName(user.getUsername())
+                                        .action("LOGIN")
+                                        .entityType("USER")
+                                        .entityId(user.getId())
+                                        .build());
+                } catch (Exception e) {
+                        System.err.println("Audit log failed for LOGIN: " + e.getMessage());
+                }
 
                 // 3. Trả về cho Client
                 return ResponseEntity.ok(new AuthResponse(token, "Bearer", user.isMustChangePassword()));
