@@ -167,15 +167,21 @@ public class CategoryService {
 
         category = folderRepository.save(category);
 
-        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
-        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
-                .actorId(userId)
-                .actorName(username)
-                .action("CREATE_CATEGORY")
-                .entityType("CATEGORY")
-                .entityId(category.getId())
-                .details(java.util.Map.of("name", category.getName(), "folderType", category.getFolderType().name()))
-                .build());
+        // Audit log – fault tolerant: không để lỗi Kafka/SecurityContext làm rollback thao tác chính
+        try {
+            String username = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication().getName();
+            auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                    .actorId(userId)
+                    .actorName(username)
+                    .action("CREATE_CATEGORY")
+                    .entityType("CATEGORY")
+                    .entityId(category.getId())
+                    .details(java.util.Map.of("name", category.getName(), "folderType", category.getFolderType().name()))
+                    .build());
+        } catch (Exception e) {
+            System.err.println("Audit log failed for CREATE_CATEGORY id=" + category.getId() + ": " + e.getMessage());
+        }
 
         return category;
     }
@@ -191,15 +197,21 @@ public class CategoryService {
         category.setName(dto.getName());
         category = folderRepository.save(category);
 
-        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
-        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
-                .actorId(userId)
-                .actorName(username)
-                .action("RENAME_CATEGORY")
-                .entityType("CATEGORY")
-                .entityId(category.getId())
-                .details(java.util.Map.of("newName", category.getName()))
-                .build());
+        // Audit log – fault tolerant
+        try {
+            String username = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication().getName();
+            auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                    .actorId(userId)
+                    .actorName(username)
+                    .action("RENAME_CATEGORY")
+                    .entityType("CATEGORY")
+                    .entityId(category.getId())
+                    .details(java.util.Map.of("newName", category.getName()))
+                    .build());
+        } catch (Exception e) {
+            System.err.println("Audit log failed for RENAME_CATEGORY id=" + id + ": " + e.getMessage());
+        }
 
         return category;
     }
@@ -216,15 +228,21 @@ public class CategoryService {
 
         softDeleteRecursive(category);
 
-        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
-        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
-                .actorId(userId)
-                .actorName(username)
-                .action("DELETE_CATEGORY")
-                .entityType("CATEGORY")
-                .entityId(category.getId())
-                .details(java.util.Map.of("name", category.getName()))
-                .build());
+        // Audit log – fault tolerant: không để lỗi Kafka/SecurityContext rollback thao tác xóa
+        try {
+            String username = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication().getName();
+            auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                    .actorId(userId)
+                    .actorName(username)
+                    .action("DELETE_CATEGORY")
+                    .entityType("CATEGORY")
+                    .entityId(category.getId())
+                    .details(java.util.Map.of("name", category.getName()))
+                    .build());
+        } catch (Exception e) {
+            System.err.println("Audit log failed for DELETE_CATEGORY id=" + id + ": " + e.getMessage());
+        }
     }
 
     public List<Category> getDeletedCategories(Long userId) {
@@ -246,14 +264,20 @@ public class CategoryService {
         category.setDeleted(false);
         category = folderRepository.save(category);
 
-        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
-        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
-                .actorId(userId)
-                .actorName(username)
-                .action("RESTORE_CATEGORY")
-                .entityType("CATEGORY")
-                .entityId(category.getId())
-                .build());
+        // Audit log – fault tolerant
+        try {
+            String username = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication().getName();
+            auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                    .actorId(userId)
+                    .actorName(username)
+                    .action("RESTORE_CATEGORY")
+                    .entityType("CATEGORY")
+                    .entityId(category.getId())
+                    .build());
+        } catch (Exception e) {
+            System.err.println("Audit log failed for RESTORE_CATEGORY id=" + id + ": " + e.getMessage());
+        }
 
         return category;
     }
@@ -270,16 +294,50 @@ public class CategoryService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vui lòng xóa mềm trước khi xóa vĩnh viễn");
         }
 
-        folderRepository.delete(category);
+        // Xóa cascade: child folders, documents, permissions trước khi xóa chính folder
+        hardDeleteRecursive(category);
 
-        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
-        auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
-                .actorId(userId)
-                .actorName(username)
-                .action("HARD_DELETE_CATEGORY")
-                .entityType("CATEGORY")
-                .entityId(category.getId())
-                .build());
+        // Audit log – fault tolerant
+        try {
+            String username = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication().getName();
+            auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                    .actorId(userId)
+                    .actorName(username)
+                    .action("HARD_DELETE_CATEGORY")
+                    .entityType("CATEGORY")
+                    .entityId(category.getId())
+                    .build());
+        } catch (Exception e) {
+            System.err.println("Audit log failed for HARD_DELETE_CATEGORY id=" + id + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Xóa vĩnh viễn folder và toàn bộ cây con:
+     * 1. Đệ quy xóa child folders
+     * 2. Xóa documents thuộc folder
+     * 3. Xóa permissions liên kết folder
+     * 4. Cuối cùng xóa chính folder
+     */
+    private void hardDeleteRecursive(Category folder) {
+        // Xóa đệ quy child folders trước
+        List<Category> children = folderRepository.findByParentId(folder.getId());
+        for (Category child : children) {
+            hardDeleteRecursive(child);
+        }
+
+        // Xóa tất cả documents thuộc folder
+        List<Document> documents = documentRepository.findByFolderId(folder.getId());
+        for (Document doc : documents) {
+            documentRepository.delete(doc);
+        }
+
+        // Xóa tất cả permissions liên kết folder
+        permissionRepository.deleteByFolderId(folder.getId());
+
+        // Xóa chính folder
+        folderRepository.delete(folder);
     }
 
     /**

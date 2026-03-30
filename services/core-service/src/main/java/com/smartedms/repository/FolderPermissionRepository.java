@@ -15,4 +15,6 @@ public interface FolderPermissionRepository extends JpaRepository<FolderPermissi
     List<FolderPermission> findByUserId(Long userId);
 
     void deleteByFolderIdAndUserId(Long folderId, Long userId);
+
+    void deleteByFolderId(Long folderId);
 }

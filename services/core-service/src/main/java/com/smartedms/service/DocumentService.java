@@ -309,15 +309,21 @@ public class DocumentService {
             version.setCurrent(true);
             documentVersionRepository.save(version);
 
-            String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
-            auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
-                    .actorId(userId)
-                    .actorName(username)
-                    .action("UPLOAD_DOCUMENT")
-                    .entityType("DOCUMENT")
-                    .entityId(document.getId())
-                    .details(java.util.Map.of("name", document.getName(), "folderId", folderId != null ? folderId : 0))
-                    .build());
+            // Audit log – fault tolerant
+            try {
+                String username = org.springframework.security.core.context.SecurityContextHolder
+                        .getContext().getAuthentication().getName();
+                auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                        .actorId(userId)
+                        .actorName(username)
+                        .action("UPLOAD_DOCUMENT")
+                        .entityType("DOCUMENT")
+                        .entityId(document.getId())
+                        .details(java.util.Map.of("name", document.getName(), "folderId", folderId != null ? folderId : 0))
+                        .build());
+            } catch (Exception auditEx) {
+                System.err.println("Audit log failed for UPLOAD_DOCUMENT id=" + document.getId() + ": " + auditEx.getMessage());
+            }
 
             return document;
         } catch (MinioException exception) {
@@ -384,15 +390,21 @@ public class DocumentService {
             newVersion.setCurrent(true);
             newVersion = documentVersionRepository.save(newVersion);
 
-            String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
-            auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
-                    .actorId(userId)
-                    .actorName(username)
-                    .action("UPLOAD_NEW_VERSION")
-                    .entityType("DOCUMENT")
-                    .entityId(document.getId())
-                    .details(java.util.Map.of("name", document.getName(), "versionNumber", newVersion.getVersionNumber()))
-                    .build());
+            // Audit log – fault tolerant
+            try {
+                String username = org.springframework.security.core.context.SecurityContextHolder
+                        .getContext().getAuthentication().getName();
+                auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
+                        .actorId(userId)
+                        .actorName(username)
+                        .action("UPLOAD_NEW_VERSION")
+                        .entityType("DOCUMENT")
+                        .entityId(document.getId())
+                        .details(java.util.Map.of("name", document.getName(), "versionNumber", newVersion.getVersionNumber()))
+                        .build());
+            } catch (Exception auditEx) {
+                System.err.println("Audit log failed for UPLOAD_NEW_VERSION docId=" + document.getId() + ": " + auditEx.getMessage());
+            }
 
             return newVersion;
         } catch (MinioException exception) {
