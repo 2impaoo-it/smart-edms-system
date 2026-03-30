@@ -58,7 +58,7 @@ public class FolderPermissionService {
      * Trả về null nếu user không có quyền.
      */
     public PermissionLevel getEffectivePermission(Long userId, Long folderId) {
-        Category folder = categoryRepository.findByIdAndIsDeletedFalse(folderId).orElse(null);
+        Category folder = categoryRepository.findByIdAndDeletedFalse(folderId).orElse(null);
         if (folder == null) {
             return null;
         }
@@ -93,7 +93,7 @@ public class FolderPermissionService {
      */
     @Transactional
     public FolderPermission shareFolder(Long folderId, Long targetUserId, String permissionLevelStr, Long currentUserId) {
-        Category folder = categoryRepository.findByIdAndIsDeletedFalse(folderId)
+        Category folder = categoryRepository.findByIdAndDeletedFalse(folderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Thư mục không tồn tại"));
 
         // Chỉ thư mục phòng ban mới share được
@@ -133,7 +133,7 @@ public class FolderPermissionService {
      */
     @Transactional
     public void revokePermission(Long folderId, Long targetUserId, Long currentUserId) {
-        Category folder = categoryRepository.findByIdAndIsDeletedFalse(folderId)
+        Category folder = categoryRepository.findByIdAndDeletedFalse(folderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Thư mục không tồn tại"));
 
         if (!currentUserId.equals(folder.getOwnerId())) {
@@ -147,7 +147,7 @@ public class FolderPermissionService {
      * Lấy danh sách user + quyền trên folder.
      */
     public List<FolderPermissionResponse> getSharedUsers(Long folderId) {
-        categoryRepository.findByIdAndIsDeletedFalse(folderId)
+        categoryRepository.findByIdAndDeletedFalse(folderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Thư mục không tồn tại"));
 
         return permissionRepository.findByFolderId(folderId).stream()

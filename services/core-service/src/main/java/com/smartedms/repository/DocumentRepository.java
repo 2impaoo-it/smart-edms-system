@@ -11,15 +11,15 @@ import java.util.List;
 
 public interface DocumentRepository extends JpaRepository<Document, Long> {
 
-    List<Document> findByFolderIdAndIsDeletedFalse(Long folderId);
+    List<Document> findByFolderIdAndDeletedFalse(Long folderId);
 
-    List<Document> findByFolderIdAndCreatedByAndIsDeletedFalse(Long folderId, Long createdBy);
+    List<Document> findByFolderIdAndCreatedByAndDeletedFalse(Long folderId, Long createdBy);
 
     List<Document> findByFolderId(Long folderId);
 
-    List<Document> findByApproverIdAndStatusAndIsDeletedFalse(Long approverId, com.smartedms.entity.DocumentStatus status);
+    List<Document> findByApproverIdAndStatusAndDeletedFalse(Long approverId, com.smartedms.entity.DocumentStatus status);
 
-    @Query("SELECT d FROM Document d WHERE d.isDeleted = false AND " +
+    @Query("SELECT d FROM Document d WHERE d.deleted = false AND " +
            "(:folderId IS NULL OR d.folderId = :folderId) AND " +
            "(:status IS NULL OR CAST(:status as string) = '' OR d.status = :status) AND " +
            "(CAST(:name as string) IS NULL OR CAST(:name as string) = '' OR LOWER(d.name) LIKE LOWER(CONCAT('%', CAST(:name as string), '%')))")
@@ -28,7 +28,7 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
                                    @Param("status") com.smartedms.entity.DocumentStatus status, 
                                    Pageable pageable);
 
-    List<Document> findByIsDeletedTrue();
+    List<Document> findByDeletedTrue();
 
     long countByStatus(com.smartedms.entity.DocumentStatus status);
 
@@ -38,6 +38,6 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
     @Query("SELECT COUNT(d) FROM Document d WHERE d.createdAt >= :date")
     long countUploadsSince(@Param("date") java.time.LocalDateTime date);
 
-    @Query("SELECT u.jobTitle, COUNT(d) FROM Document d JOIN User u ON d.createdBy = u.id WHERE d.isDeleted = false GROUP BY u.jobTitle")
+    @Query("SELECT u.jobTitle, COUNT(d) FROM Document d JOIN User u ON d.createdBy = u.id WHERE d.deleted = false GROUP BY u.jobTitle")
     List<Object[]> countByDepartment();
 }

@@ -70,9 +70,9 @@ public class DocumentService {
 
     public List<Document> getByFolderId(Long folderId, Long userId) {
         if (folderId == null) {
-            return documentRepository.findByFolderIdAndCreatedByAndIsDeletedFalse(null, userId);
+            return documentRepository.findByFolderIdAndCreatedByAndDeletedFalse(null, userId);
         }
-        return documentRepository.findByFolderIdAndIsDeletedFalse(folderId);
+        return documentRepository.findByFolderIdAndDeletedFalse(folderId);
     }
 
     @Transactional
@@ -147,12 +147,12 @@ public class DocumentService {
     }
 
     public List<Document> getDeletedDocuments() {
-        return documentRepository.findByIsDeletedTrue();
+        return documentRepository.findByDeletedTrue();
     }
 
     @Transactional
     public void emptyAllTrash() {
-        List<Document> deletedDocs = documentRepository.findByIsDeletedTrue();
+        List<Document> deletedDocs = documentRepository.findByDeletedTrue();
         for (Document doc : deletedDocs) {
             hardDeleteDocument(doc.getId());
         }
@@ -296,7 +296,7 @@ public class DocumentService {
     }
 
     public List<Document> getPendingApprovals(Long approverId) {
-        return documentRepository.findByApproverIdAndStatusAndIsDeletedFalse(approverId, com.smartedms.entity.DocumentStatus.PENDING_APPROVAL);
+        return documentRepository.findByApproverIdAndStatusAndDeletedFalse(approverId, com.smartedms.entity.DocumentStatus.PENDING_APPROVAL);
     }
 
     @Transactional

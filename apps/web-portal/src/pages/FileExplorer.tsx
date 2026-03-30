@@ -206,7 +206,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                 owner: ownerId || user?.id || 'sys', // default owner
                 status: 'draft',
                 parentId: cat.parentId ? String(cat.parentId) : null,
-                isDeleted: cat.isDeleted
+                isDeleted: cat.deleted
             }));
 
             // Map Backend Document to Frontend FileItem
@@ -219,7 +219,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                 owner: ownerId || user?.id || 'sys',
                 status: doc.status || 'DRAFT',
                 parentId: doc.folderId ? String(doc.folderId) : null,
-                isDeleted: doc.isDeleted
+                isDeleted: doc.deleted
             }));
 
             setFiles([...mappedFolders, ...mappedDocuments]);

@@ -33,7 +33,7 @@ public class Document {
     private Long approverId;
 
     @Column(name = "is_deleted", nullable = false)
-    private boolean isDeleted = false;
+    private boolean deleted = false;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)
