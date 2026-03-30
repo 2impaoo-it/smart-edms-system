@@ -297,6 +297,20 @@ public class DocumentService {
         document.setStatus(com.smartedms.entity.DocumentStatus.APPROVED);
         document = documentRepository.save(document);
 
+        DocumentVersion currentVersion = documentVersionRepository.findByDocumentIdAndIsCurrentTrue(documentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document version not found"));
+
+        DocumentVersion newVersion = new DocumentVersion();
+        newVersion.setDocumentId(document.getId());
+        newVersion.setVersionNumber(currentVersion.getVersionNumber() + 1);
+        newVersion.setFilePath(currentVersion.getFilePath());
+        newVersion.setCreatedBy(userId);
+        newVersion.setCurrent(true);
+
+        currentVersion.setCurrent(false);
+        documentVersionRepository.save(currentVersion);
+        documentVersionRepository.save(newVersion);
+
         // Audit log – fault tolerant
         try {
             String username = org.springframework.security.core.context.SecurityContextHolder
