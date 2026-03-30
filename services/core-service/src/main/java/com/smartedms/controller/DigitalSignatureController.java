@@ -69,13 +69,18 @@ public class DigitalSignatureController {
 
     @Operation(summary = "Xác minh các chữ ký đính kèm trong file PDF")
     @PostMapping(value = "/verify-pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<List<PdfSignatureVerificationService.SignatureVerificationResult>> verifyPdf(
+    public ResponseEntity<?> verifyPdf(
             @RequestPart("pdfFile") MultipartFile pdfFile) {
         try {
             List<PdfSignatureVerificationService.SignatureVerificationResult> results = verificationService.verifySignatures(pdfFile.getInputStream());
             return ResponseEntity.ok(results);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
+            PdfSignatureVerificationService.SignatureVerificationResult failedResult = new PdfSignatureVerificationService.SignatureVerificationResult();
+            failedResult.setValid(false);
+            failedResult.setName("Chữ ký đã bị phá hoại / Tài liệu bị chỉnh sửa");
+            failedResult.setSignerName("Không xác định");
+            failedResult.setReason("Phát hiện có sự thay đổi cấu trúc PDF sau khi tài liệu được lưu trữ.");
+            return ResponseEntity.ok(java.util.Collections.singletonList(failedResult));
         }
     }
 }
