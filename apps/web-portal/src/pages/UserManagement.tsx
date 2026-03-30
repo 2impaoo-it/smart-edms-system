@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Plus, Filter, UserCog, MoreHorizontal, Mail, Phone, Briefcase, AtSign, Loader2, X, CheckCircle2, RefreshCw } from "lucide-react";
+import { Search, Plus, Filter, UserCog, MoreHorizontal, Mail, Phone, Briefcase, AtSign, Loader2, X, CheckCircle2, RefreshCw, ShieldAlert } from "lucide-react";
 import { cn } from "../lib/utils";
 import { gooeyToast as toast } from "goey-toast";
 import { getUsers, createUser, toggleUserStatus, resetUserKeystore } from "../services/userService";
@@ -115,17 +115,23 @@ export function UserManagement() {
   const getUserRole = (user: any) => {
     const roles = Array.isArray(user.roles) ? user.roles : [];
     
-    // Convert to simple string array if it's object array
+    // Convert to simple string array
     const roleNames = roles.map((r: any) => {
-      if (typeof r === 'string') return r;
-      return r.name || r.authority || '';
+      if (typeof r === 'string') return r.toUpperCase();
+      return (r.name || r.authority || '').toUpperCase();
     });
 
-    if (roleNames.includes('ROLE_ADMIN')) return 'ADMIN';
-    if (roleNames.includes('ROLE_MANAGER')) return 'MANAGER';
-    if (roleNames.includes('ROLE_USER') || roleNames.includes('ROLE_STAFF')) return 'STAFF';
+    if (roleNames.some(r => r.includes('ADMIN'))) return 'ADMIN';
+    if (roleNames.some(r => r.includes('MANAGER'))) return 'MANAGER';
+    if (roleNames.some(r => r.includes('USER') || r.includes('STAFF'))) return 'STAFF';
     
-    if (user.role) return user.role.replace('ROLE_', '');
+    // Fallback to legacy role field
+    if (user.role) {
+        const r = user.role.toUpperCase();
+        if (r.includes('ADMIN')) return 'ADMIN';
+        if (r.includes('MANAGER')) return 'MANAGER';
+        return 'STAFF';
+    }
     return 'STAFF';
   };
 
@@ -137,9 +143,7 @@ export function UserManagement() {
     
     let matchedRole = false;
     if (roleFilter === "ALL") matchedRole = true;
-    else if (roleFilter === "STAFF") matchedRole = (uRole === "STAFF");
-    else if (roleFilter === "MANAGER") matchedRole = (uRole === "MANAGER");
-    else if (roleFilter === "ADMIN") matchedRole = (uRole === "ADMIN");
+    else matchedRole = (uRole === roleFilter);
 
     return matchesSearch && matchedRole;
   });

@@ -53,6 +53,19 @@ export function MainLayout() {
         const stored = localStorage.getItem('token');
         if (!stored || !currentUser) return;
 
+        // Fetch full user details to get real numeric ID if current id is a string (username)
+        import("../../services/userService").then(m => m.getOrgChart()).then(res => {
+            if (Array.isArray(res.data)) {
+                const fullInfo = res.data.find((u: any) => u.username === currentUser.username || u.username === currentUser.id);
+                if (fullInfo && String(fullInfo.id) !== String(currentUser.id)) {
+                    const updated = { ...currentUser, ...fullInfo };
+                    localStorage.setItem('user', JSON.stringify(updated));
+                    setCurrentUser(updated);
+                    window.dispatchEvent(new Event('user-updated'));
+                }
+            }
+        }).catch(console.error);
+
         const socket = import("../../services/socketService").then(m => m.initSocket(currentUser.id));
         
         socket.then(s => {

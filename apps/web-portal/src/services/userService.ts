@@ -14,7 +14,7 @@ export const createUser = (data: CreateUserRequest) => {
 };
 
 export const getUsers = (params?: { role?: string, status?: string, search?: string }) =>
-  axiosClient.get("/users/org-chart", { params });
+  axiosClient.get("/users", { params });
 
 // ------------------- NEW APIS -------------------
 export const getOrgChart = () => axiosClient.get("/users/org-chart");

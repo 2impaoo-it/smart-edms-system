@@ -36,6 +36,14 @@ import { getPosts, createPost, toggleLike, addComment } from "../services/feedSe
 import { initSocket, disconnectSocket } from "../services/socketService";
 import { gooeyToast as toast } from "goey-toast";
 
+// --- Helper: Get Numeric User ID ---
+const getNumericId = (user: any): number => {
+    if (!user) return 0;
+    // Try to get numeric id from full user object (fetched in MainLayout)
+    const id = parseInt(user.id);
+    return isNaN(id) ? 0 : id;
+};
+
 // --- 1. ADMIN DASHBOARD ---
 export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: string) => void }) {
     const [overview, setOverview] = useState({ totalFolders: 0, totalDocuments: 0, statusBreakdown: {} as any });
@@ -52,7 +60,10 @@ export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: 
         getDashboardOverview().then(res => setOverview(res.data)).catch(console.error);
         getDashboardStorage().then(res => setStorage(res.data)).catch(console.error);
         getSystemHealth().then(res => setHealth(res.data)).catch(console.error);
-        getAuditLogs({ limit: 5 }).then(res => setLogs(res.data || [])).catch(console.error);
+        getAuditLogs({ limit: 5 }).then(res => {
+            const auditData = Array.isArray(res.data) ? res.data : (res.data as any)?.data || [];
+            setLogs(auditData);
+        }).catch(console.error);
         getPosts().then(res => setPosts(res.data || [])).catch(console.error);
         import("../services/userService").then(m => m.getOrgChart()).then(res => {
             if (Array.isArray(res.data)) setTotalUsers(res.data.length);
@@ -63,11 +74,18 @@ export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: 
         e.preventDefault();
         if(!newPostContent.trim()) return;
         const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const authorId = getNumericId(storedUser);
+        
+        if (authorId === 0) {
+            toast.error("Lỗi xác thực", { description: "Không tìm thấy ID nhân viên. Vui lòng tải lại trang." });
+            return;
+        }
+
         try {
             const res = await createPost({ 
                 content: newPostContent, 
                 role: "ROLE_ADMIN",
-                authorId: storedUser.id,
+                authorId: authorId,
                 authorName: storedUser.fullName || storedUser.username,
                 avatar: storedUser.avatar
             });
@@ -182,7 +200,7 @@ export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: 
                     <div className="glass-panel p-8 rounded-[40px] bg-white/60 dark:bg-white/5 border-white/40 shadow-xl">
                         <h3 className="text-lg font-black uppercase tracking-tighter mb-6">Hoạt động mới nhất</h3>
                         <div className="space-y-4">
-                            {logs.slice(0, 4).map((log, i) => (
+                            {(Array.isArray(logs) ? logs : []).slice(0, 4).map((log, i) => (
                                 <div key={i} className="flex gap-3 pb-4 border-b border-white/40 dark:border-white/10 last:border-0 last:pb-0">
                                     <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-white/5 flex items-center justify-center shrink-0">
                                         <History className="w-4 h-4 text-muted-foreground" />
@@ -322,11 +340,18 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
         e.preventDefault();
         if(!newPostContent.trim()) return;
         const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const authorId = getNumericId(storedUser);
+
+        if (authorId === 0) {
+            toast.error("Lỗi xác thực", { description: "Không tìm thấy ID nhân viên. Vui lòng tải lại trang." });
+            return;
+        }
+
         try {
             const res = await createPost({ 
                 content: newPostContent, 
                 role: "ROLE_MANAGER",
-                authorId: storedUser.id,
+                authorId: authorId,
                 authorName: storedUser.fullName || storedUser.username,
                 avatar: storedUser.avatar
             });
@@ -340,7 +365,7 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
     };
 
     const handleLike = async (postId: number | string) => {
-        const userId = safeUser.id || 1; 
+        const userId = getNumericId(safeUser);
         try {
             await toggleLike(postId, userId);
             setPosts(prev => prev.map(p => {
@@ -356,8 +381,9 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
 
     const handleSendComment = async (postId: number | string) => {
         if (!newCommentText.trim()) return;
+        const userId = getNumericId(safeUser);
         try {
-            const res = await addComment(postId, { userId: safeUser.id, userName: safeUser.fullName || safeUser.username, content: newCommentText });
+            const res = await addComment(postId, { userId: userId, userName: safeUser.fullName || safeUser.username, content: newCommentText });
             if (res.data) {
                 setPosts(prev => prev.map(p => (p._id === postId || p.id === postId) ? res.data : p));
             }
@@ -569,7 +595,7 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
 
                 <div className="space-y-6">
                     <h3 className="text-xs font-black text-muted-foreground uppercase tracking-widest">Đã ký gần đây</h3>
-                    {signedFiles.slice(0, 5).map(file => (
+                    {(Array.isArray(signedFiles) ? signedFiles : []).slice(0, 5).map(file => (
                         <div key={file.id} className="glass-panel p-5 rounded-[24px] border-l-4 border-l-success shadow-lg bg-white/60 dark:bg-white/5 transition-transform hover:translate-x-1">
                             <div className="flex justify-between items-start mb-3">
                                 <div className="flex items-start gap-3 text-success">
@@ -642,8 +668,8 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
                                 </div>
                                 <div className="p-6 text-sm leading-relaxed whitespace-pre-line text-slate-700 dark:text-slate-300 font-medium">{post.content}</div>
                                 <div className="px-6 py-4 flex items-center gap-6 border-t border-slate-100/50 dark:border-white/10">
-                                    <button onClick={() => handleLike(post._id || post.id)} className={cn("flex items-center gap-2 text-xs font-black uppercase transition-all", (post.likes || []).includes(safeUser.id) ? "text-pink-500" : "text-muted-foreground hover:text-slate-700 dark:hover:text-slate-200")}>
-                                        <Heart className={cn("w-5 h-5", (post.likes || []).includes(safeUser.id) ? "fill-pink-500 scale-110" : "")} /> 
+                                    <button onClick={() => handleLike(post._id || post.id)} className={cn("flex items-center gap-2 text-xs font-black uppercase transition-all", (post.likes || []).includes(getNumericId(safeUser)) ? "text-pink-500" : "text-muted-foreground hover:text-slate-700 dark:hover:text-slate-200")}>
+                                        <Heart className={cn("w-5 h-5", (post.likes || []).includes(getNumericId(safeUser)) ? "fill-pink-500 scale-110" : "")} /> 
                                         {(post.likes || []).length} Yêu Thích
                                     </button>
                                     <button onClick={() => setActiveCommentPostId(activeCommentPostId === (post._id || post.id) ? null : (post._id || post.id))} className="flex items-center gap-2 text-xs font-black uppercase text-muted-foreground hover:text-primary transition-all">
@@ -722,12 +748,13 @@ export function StaffDashboard({ user }: { user: any, onNavigate: (path: string)
     }, [safeUser.id]);
 
     const handleLike = async (postId: number | string) => {
+        const userId = getNumericId(safeUser);
         try {
-            await toggleLike(postId, safeUser.id);
+            await toggleLike(postId, userId);
             setPosts(prev => prev.map(p => {
                 if(p._id !== postId && p.id !== postId) return p;
-                const isLiked = !(p.likes || []).includes(safeUser.id);
-                const newLikes = isLiked ? [...(p.likes || []), safeUser.id] : (p.likes || []).filter((id:any) => id !== safeUser.id);
+                const isLiked = !(p.likes || []).includes(userId);
+                const newLikes = isLiked ? [...(p.likes || []), userId] : (p.likes || []).filter((id:any) => id !== userId);
                 return { ...p, likes: newLikes };
             }));
         } catch(err) { console.error(err); }
@@ -735,8 +762,9 @@ export function StaffDashboard({ user }: { user: any, onNavigate: (path: string)
 
     const handleSendComment = async (postId: number | string) => {
         if (!newCommentText.trim()) return;
+        const userId = getNumericId(safeUser);
         try {
-            const res = await addComment(postId, { userId: safeUser.id, userName: safeUser.fullName || safeUser.username, content: newCommentText });
+            const res = await addComment(postId, { userId: userId, userName: safeUser.fullName || safeUser.username, content: newCommentText });
             if (res.data) setPosts(prev => prev.map(p => (p._id === postId || p.id === postId) ? res.data : p));
             setNewCommentText("");
         } catch (err) { console.error(err); }
@@ -770,8 +798,8 @@ export function StaffDashboard({ user }: { user: any, onNavigate: (path: string)
                             </div>
                             <div className="p-6 text-sm leading-relaxed whitespace-pre-line text-slate-700 dark:text-slate-300 font-medium">{post.content}</div>
                             <div className="px-6 py-4 flex items-center gap-6 border-t border-slate-100/50 dark:border-white/10">
-                                <button onClick={() => handleLike(post._id || post.id)} className={cn("flex items-center gap-2 text-xs font-black uppercase transition-all", (post.likes || []).includes(safeUser.id) ? "text-pink-500" : "text-muted-foreground hover:text-slate-700 dark:hover:text-slate-200")}>
-                                    <Heart className={cn("w-5 h-5", (post.likes || []).includes(safeUser.id) ? "fill-pink-500 scale-110" : "")} /> 
+                                <button onClick={() => handleLike(post._id || post.id)} className={cn("flex items-center gap-2 text-xs font-black uppercase transition-all", (post.likes || []).includes(getNumericId(safeUser)) ? "text-pink-500" : "text-muted-foreground hover:text-slate-700 dark:hover:text-slate-200")}>
+                                    <Heart className={cn("w-5 h-5", (post.likes || []).includes(getNumericId(safeUser)) ? "fill-pink-500 scale-110" : "")} /> 
                                     {(post.likes || []).length} Yêu Thích
                                 </button>
                                 <button onClick={() => setActiveCommentPostId(activeCommentPostId === (post._id || post.id) ? null : (post._id || post.id))} className="flex items-center gap-2 text-xs font-black uppercase text-muted-foreground hover:text-primary transition-all">
