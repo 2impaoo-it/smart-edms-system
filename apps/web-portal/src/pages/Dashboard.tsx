@@ -17,6 +17,7 @@ import {
     Download,
     
     ShieldCheck,
+    ShieldAlert,
     X,
     Heart,
     MessageCircle,
