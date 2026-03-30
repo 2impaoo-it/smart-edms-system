@@ -33,9 +33,21 @@ import {
 
 import { cn } from "../lib/utils";
 import { SignerWorkspace } from "./SignerWorkspace";
-import { getDashboardOverview, getSystemHealth, getDashboardStorage } from "../services/adminService";
+import { 
+    getDashboardOverview, 
+    getSystemHealth, 
+    getDashboardStorage,
+    getActivityStats,
+    getStorageByDept
+} from "../services/adminService";
 import { getAuditLogs } from "../services/auditService";
 import { getPosts, createPost, toggleLike, addComment } from "../services/feedService";
+import { 
+    getPendingApprovals, 
+    searchDocuments, 
+    getDocumentStreamUrl 
+} from "../services/documentService";
+import { getOrgChart } from "../services/userService";
 import { initSocket, disconnectSocket } from "../services/socketService";
 import { gooeyToast as toast } from "goey-toast";
 
@@ -68,43 +80,39 @@ export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: 
         getDashboardStorage().then(res => setStorage(res.data)).catch(console.error);
         getSystemHealth().then(res => setHealth(res.data)).catch(console.error);
         
-        // Fetch new analytics data
-        import("../services/adminService").then(m => {
-            // Attempt to get activity stats, fallback to deriving from logs
-            m.getActivityStats().then(res => setActivityData(res.data)).catch(() => {
-                getAuditLogs({ limit: 100 }).then(auditRes => {
-                    const logsData = Array.isArray(auditRes.data) ? auditRes.data : (auditRes.data as any)?.data || [];
-                    const last7Days = Array.from({ length: 7 }, (_, i) => {
-                        const d = new Date();
-                        d.setDate(d.getDate() - i);
-                        return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
-                    }).reverse();
+        // Fetch analytics data with fallback
+        getActivityStats().then(res => setActivityData(res.data)).catch(() => {
+            getAuditLogs({ limit: 100 }).then(auditRes => {
+                const logsData = Array.isArray(auditRes.data) ? auditRes.data : (auditRes.data as any)?.data || [];
+                const last7Days = Array.from({ length: 7 }, (_, i) => {
+                    const d = new Date();
+                    d.setDate(d.getDate() - i);
+                    return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
+                }).reverse();
 
-                    const stats = last7Days.map(date => {
-                        const dayLogs = logsData.filter((l: any) => 
-                            new Date(l.timestamp || l.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }) === date
-                        );
-                        return {
-                            name: date,
-                            uploads: dayLogs.filter((l: any) => l.action?.includes("UPLOAD")).length,
-                            signs: dayLogs.filter((l: any) => l.action?.includes("SIGN")).length
-                        };
-                    });
-                    setActivityData(stats);
-                }).catch(() => setActivityData([]));
-            });
-
-            m.getStorageByDept().then(res => setStorageByDept(res.data)).catch(() => {
-                // If API not ready, we show empty or let the chart handle empty array
-                setStorageByDept([]);
-            });
+                const stats = last7Days.map(date => {
+                    const dayLogs = logsData.filter((l: any) => 
+                        new Date(l.timestamp || l.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }) === date
+                    );
+                    return {
+                        name: date,
+                        uploads: dayLogs.filter((l: any) => l.action?.includes("UPLOAD")).length,
+                        signs: dayLogs.filter((l: any) => l.action?.includes("SIGN")).length
+                    };
+                });
+                setActivityData(stats);
+            }).catch(() => setActivityData([]));
         });
+
+        getStorageByDept().then(res => setStorageByDept(res.data)).catch(() => setStorageByDept([]));
 
         getAuditLogs({ limit: 6 }).then(res => {
             const auditData = Array.isArray(res.data) ? res.data : (res.data as any)?.data || [];
             setLogs(auditData);
         }).catch(console.error);
+
         getPosts().then(res => setPosts(res.data || [])).catch(console.error);
+        
         import("../services/userService").then(m => m.getOrgChart()).then(res => {
             if (Array.isArray(res.data)) setTotalUsers(res.data.length);
         }).catch(console.error);
@@ -398,9 +406,9 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
     const fetchData = async () => {
         try {
             const [pendingRes, signedRes, orgRes] = await Promise.all([
-                import("../services/documentService").then(m => m.getPendingApprovals()),
-                import("../services/documentService").then(m => m.searchDocuments({ status: "SIGNED" as any, size: 5 })),
-                import("../services/userService").then(m => m.getOrgChart())
+                getPendingApprovals(),
+                searchDocuments({ status: "SIGNED" as any, size: 5 }),
+                getOrgChart()
             ]);
             
             setFiles(Array.isArray(pendingRes.data) ? pendingRes.data : []);
@@ -450,8 +458,7 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
 
     const handleDownload = async (file: any) => {
         try {
-            const docService = await import("../services/documentService");
-            const res = await docService.getDocumentStreamUrl(file.id);
+            const res = await getDocumentStreamUrl(file.id);
             const blob = new Blob([res.data], { type: 'application/octet-stream' });
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');

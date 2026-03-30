@@ -31,4 +31,13 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
     List<Document> findByIsDeletedTrue();
 
     long countByStatus(com.smartedms.entity.DocumentStatus status);
+
+    @Query("SELECT COUNT(d) FROM Document d WHERE d.status = 'SIGNED' AND d.updatedAt >= :date")
+    long countSignedSince(@Param("date") java.time.LocalDateTime date);
+
+    @Query("SELECT COUNT(d) FROM Document d WHERE d.createdAt >= :date")
+    long countUploadsSince(@Param("date") java.time.LocalDateTime date);
+
+    @Query("SELECT u.jobTitle, COUNT(d) FROM Document d JOIN User u ON d.createdBy = u.id WHERE d.isDeleted = false GROUP BY u.jobTitle")
+    List<Object[]> countByDepartment();
 }
