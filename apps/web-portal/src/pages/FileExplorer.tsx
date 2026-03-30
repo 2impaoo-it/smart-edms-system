@@ -28,7 +28,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import type { FileItem, User } from "../lib/types";
 import { cn } from "../lib/utils";
-import { getFolderContents, createFolder, deleteFolder, getPersonalTree, getDepartmentTree, shareFolder } from "../services/folderService";
+import { getFolderContents, createFolder, deleteFolder, getPersonalTree, getDepartmentTree, shareFolder, renameFolder } from "../services/folderService";
 import { uploadDocument, getDocumentStreamUrl, getFolderDocuments, deleteDocument, getDocumentVersions, getDocumentVersionStreamUrl, uploadNewDocumentVersion, signDocument, submitForApproval, rejectDocument, approveDocument } from "../services/documentService";
 import { getOrgChart } from "../services/userService";
 
@@ -120,6 +120,12 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
     const [shareFolderId, setShareFolderId] = useState<string | null>(null);
     const [shareUserId, setShareUserId] = useState("");
     const [shareRole, setShareRole] = useState<'VIEWER'|'EDITOR'>('VIEWER');
+
+    // Rename Modal State
+    const [showRenameModal, setShowRenameModal] = useState(false);
+    const [renameItemName, setRenameItemName] = useState("");
+    const [itemToRenameId, setItemToRenameId] = useState<string | null>(null);
+    const [itemToRenameType, setItemToRenameType] = useState<string | null>(null);
 
     // System Users for Dropdown
     const [orgUsers, setOrgUsers] = useState<any[]>([]);
@@ -381,18 +387,69 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
         try {
             if (fileToDelete?.type === 'folder') {
                 await deleteFolder(rawId);
-                toast.success("Đã xóa thư mục", { description: `Thư mục "${fileToDelete.name}" đã được chuyển vào thùng rác`, icon: '🗑️' });
+                toast.success("Đã xóa thư mục", { description: `Thư mục "${fileToDelete.name}" đã bị xóa tạm` });
                 fetchFilesAndFolders();
             } else {
                 await deleteDocument(rawId);
-                toast.success("Đã xóa tài liệu", { description: `Tệp tin "${fileToDelete?.name}" đã được chuyển vào thùng rác`, icon: '🗑️' });
+                toast.success("Đã xóa tài liệu", { description: `Tệp tin "${fileToDelete?.name}" đã bị xóa tạm` });
                 fetchFilesAndFolders();
             }
         } catch (error: any) {
-            toast.error("Thao tác xóa thất bại", { description: error?.response?.data?.message || "Hệ thống bận, vui lòng thử lại sau" });
+            toast.error("Xóa thất bại", { description: error?.response?.data?.message || "Bạn không có quyền xóa mục này hoặc mục này đang chứa dữ liệu của người khác." });
         }
         
         setContextMenu(null);
+    };
+
+    const handleDownloadDocument = async (id: string) => {
+        setContextMenu(null);
+        const fileToDownload = files.find(f => f.id === id);
+        const rawId = id.replace('doc_', '');
+        try {
+            const response = await getDocumentStreamUrl(rawId);
+            const blob = new Blob([response.data]);
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileToDownload?.name || 'tai-lieu.pdf';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            toast.success("Đang tải tệp tin...", { description: fileToDownload?.name });
+        } catch (error: any) {
+            toast.error("Tải xuống thất bại", { description: error?.response?.data?.message || "Lý do: Không tìm thấy file hoặc phiên đăng nhập hết hạn." });
+        }
+    };
+
+    const handleOpenRename = (id: string) => {
+        const item = files.find(f => f.id === id);
+        if (!item) return;
+        setContextMenu(null);
+        setItemToRenameId(id);
+        setItemToRenameType(item.type);
+        setRenameItemName(item.name);
+        setShowRenameModal(true);
+    };
+
+    const handleRenameSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!renameItemName.trim() || !itemToRenameId) return;
+        
+        const rawId = itemToRenameId.replace('folder_', '').replace('doc_', '');
+        try {
+            if (itemToRenameType === 'folder') {
+                await renameFolder(rawId, renameItemName.trim());
+                toast.success("Đổi tên thành công", { description: `Thư mục đổi thành: ${renameItemName}` });
+            } else {
+                toast.error("Chưa hỗ trợ", { description: "Tính năng đổi tên tài liệu (Document) đang được phát triển." });
+                return;
+            }
+            setShowRenameModal(false);
+            fetchFilesAndFolders();
+        } catch (error: any) {
+            toast.error("Đổi tên thất bại", { description: error?.response?.data?.message || "Bạn không có quyền đổi tên hoặc tên đã tồn tại." });
+        }
     };
 
     const handleRecall = (id: string) => {
@@ -512,7 +569,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
             fetchFilesAndFolders();
             setViewFileId(null);
         } catch (e: any) {
-            toast.error("Lỗi trình ký", { description: e?.response?.data?.message || "Không thể gửi yêu cầu trình duyệt." });
+            toast.error("Lỗi trình ký", { description: e?.response?.data?.message || "Backend không phản hồi hoặc bạn không có quyền." });
         }
     };
 
@@ -720,12 +777,14 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                         className="fixed z-[999] glass-panel rounded-2xl w-48 shadow-2xl border-white/60 overflow-hidden bg-white/90"
                     >
                         <div className="p-1.5 space-y-1">
-                            <button className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-primary/10 hover:text-primary rounded-xl transition-colors">
+                            <button onClick={() => handleOpenRename(contextMenu.id)} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-primary/10 hover:text-primary rounded-xl transition-colors">
                                 <PenTool className="w-4 h-4" /> Đổi tên
                             </button>
-                            <button className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-primary/10 hover:text-primary rounded-xl transition-colors">
-                                <Download className="w-4 h-4" /> Tải xuống
-                            </button>
+                            {contextMenu && files.find(f => f.id === contextMenu.id)?.type !== 'folder' && (
+                                <button onClick={() => handleDownloadDocument(contextMenu.id)} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-primary/10 hover:text-primary rounded-xl transition-colors">
+                                    <Download className="w-4 h-4" /> Tải xuống
+                                </button>
+                            )}
                             {contextMenu && files.find(f => f.id === contextMenu.id)?.type === 'folder' && folderType === 'DEPARTMENT' && (
                                 <button onClick={() => {setShareFolderId(contextMenu.id.replace('folder_', '')); setContextMenu(null);}} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-primary/10 hover:text-primary rounded-xl transition-colors">
                                     <Users className="w-4 h-4" /> Chia sẻ
@@ -792,6 +851,46 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                                 <div className="flex gap-3">
                                     <button type="button" onClick={() => setShowNewFolderModal(false)} className="flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase text-muted-foreground bg-slate-100 hover:bg-slate-200 transition-colors">Hủy</button>
                                     <button type="submit" disabled={!newFolderName.trim()} className="flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase bg-primary text-white shadow-neon hover:scale-[1.02] disabled:opacity-50 transition-all">Tạo mới</button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Rename Modal */}
+            <AnimatePresence>
+                {showRenameModal && (
+                    <div className="fixed inset-0 z-[160] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
+                        <motion.div 
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="relative w-full max-w-sm glass-panel rounded-[40px] p-8 border-white/60 shadow-[0_32px_128px_rgba(0,0,0,0.4)] bg-white/95"
+                        >
+                            <button onClick={() => setShowRenameModal(false)} className="absolute top-6 right-6 p-2 hover:bg-slate-100 rounded-xl transition-all">
+                                <X className="w-5 h-5 text-muted-foreground" />
+                            </button>
+                            <div className="w-16 h-16 rounded-2xl bg-warning/10 text-warning flex items-center justify-center mb-6">
+                                <PenTool className="w-8 h-8" />
+                            </div>
+                            <h3 className="text-xl font-black mb-1">Đổi tên {itemToRenameType === 'folder' ? 'thư mục' : 'tài liệu'}</h3>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-6">Nhập tên mới thay cho tên cũ</p>
+
+                            <form onSubmit={handleRenameSubmit}>
+                                <input 
+                                    autoFocus
+                                    type="text" 
+                                    placeholder="Tên mới..." 
+                                    value={renameItemName}
+                                    onChange={e => setRenameItemName(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-warning/10 transition-all mb-8" 
+                                />
+                                <div className="flex gap-3">
+                                    <button type="button" onClick={() => setShowRenameModal(false)} className="flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase text-muted-foreground bg-slate-100 hover:bg-slate-200 transition-colors">Hủy</button>
+                                    <button type="submit" disabled={!renameItemName.trim()} className="flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase bg-warning text-white shadow-neon hover:scale-[1.02] disabled:opacity-50 transition-all">
+                                        Cập Nhật
+                                    </button>
                                 </div>
                             </form>
                         </motion.div>
