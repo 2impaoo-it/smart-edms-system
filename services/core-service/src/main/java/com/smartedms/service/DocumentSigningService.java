@@ -102,10 +102,10 @@ public class DocumentSigningService {
             auditLogPublisherService.publishLog(com.smartedms.dto.AuditLogRequest.builder()
                     .actorId(userId)
                     .actorName(username)
-                    .action("DOCUMENT_SIGNED")
+                    .action("SIGN_DOCUMENT")
                     .entityType("DOCUMENT")
                     .entityId(document.getId())
-                    .details(java.util.Map.of("name", document.getName(), "reason", reason))
+                    .details(java.util.Map.of("name", document.getName(), "reason", reason != null ? reason : ""))
                     .build());
 
             return documentVersionRepository.save(newVersion);

@@ -36,6 +36,27 @@ export function Sidebar({ role, user, notifications }: SidebarProps) {
     const location = useLocation();
     const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
     const [showNotifications, setShowNotifications] = useState(false);
+    const [pendingCount, setPendingCount] = useState<number>(0);
+    const [hasViewedApprovals, setHasViewedApprovals] = useState(false);
+
+    // Fetch pending approvals for MANAGER
+    useEffect(() => {
+        if (role === 'MANAGER') {
+            import('../../services/documentService').then(({ getPendingApprovals }) => {
+                getPendingApprovals().then(res => {
+                    const count = Array.isArray(res.data) ? res.data.length : (res.data?.content?.length || 0);
+                    setPendingCount(count);
+                }).catch(err => console.error("Could not fetch pending approvals count:", err));
+            });
+        }
+    }, [role]);
+
+    // Reset badge when visiting approvals page
+    useEffect(() => {
+        if (location.pathname === '/dashboard/approvals') {
+            setHasViewedApprovals(true);
+        }
+    }, [location.pathname]);
 
     // Click outside to close notifications
     useEffect(() => {
@@ -51,20 +72,17 @@ export function Sidebar({ role, user, notifications }: SidebarProps) {
         COMMON: [
             { name: "Tổng quan", href: "/dashboard", icon: LayoutDashboard },
             ...(role !== 'ADMIN' ? [{ name: "Tài liệu cá nhân", href: "/dashboard/files", icon: FileText }] : []),
-            { name: "Kho phòng ban", href: "/dashboard/department", icon: Briefcase },
+            ...(role !== 'ADMIN' ? [{ name: "Kho phòng ban", href: "/dashboard/department", icon: Briefcase }] : []),
             ...(role !== 'ADMIN' ? [{ name: "Thùng rác", href: "/dashboard/recycle-bin", icon: Trash2 }] : []),
         ],
         MANAGER: [
-            { name: "Danh sách trình ký", href: "/dashboard/approvals", icon: PenTool, badge: 8 },
+            { name: "Danh sách trình ký", href: "/dashboard/approvals", icon: PenTool, badge: (pendingCount > 0 && !hasViewedApprovals) ? pendingCount : undefined },
             { name: "Quản lý chữ ký", href: "/dashboard/signatures", icon: ShieldAlert },
-            { name: "Cài đặt & Khóa", href: "/dashboard/settings", icon: Settings },
         ],
         ADMIN: [
             { name: "Quản lý người dùng", href: "/dashboard/users", icon: Users },
-            { name: "Quản lý chữ ký", href: "/dashboard/signatures", icon: ShieldAlert },
             { name: "Log hệ thống", href: "/dashboard/audit-logs", icon: History },
             { name: "Kho tài liệu tổng", href: "/dashboard/storage", icon: Database },
-            { name: "Cài đặt hệ thống", href: "/dashboard/settings", icon: Settings },
         ]
     };
 
@@ -193,7 +211,7 @@ export function Sidebar({ role, user, notifications }: SidebarProps) {
                                                         <button 
                                                             onClick={() => {
                                                                 setShowNotifications(false);
-                                                                toast.success("Đã đánh dấu đọc tất cả");
+                                                                toast.success("Thành công", { description: "Đã đánh dấu đọc tất cả thông báo" });
                                                             }}
                                                             className="w-full py-2.5 rounded-xl text-xs font-bold text-primary bg-primary/10 hover:bg-primary hover:text-white transition-colors flex items-center justify-center gap-2"
                                                         >
@@ -258,8 +276,8 @@ export function Sidebar({ role, user, notifications }: SidebarProps) {
                         <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full z-10"></div>
                     </div>
                     <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{user?.name || "Người dùng"}</h4>
-                        <p className="text-[10px] font-black text-primary uppercase tracking-widest truncate">{user?.role === 'ADMIN' ? 'Quản trị viên' : user?.role === 'MANAGER' ? 'Trưởng phòng' : 'Nhân viên'}</p>
+                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{user?.fullName || user?.name || user?.username || "Người dùng"}</h4>
+                        <p className="text-[10px] font-black text-primary uppercase tracking-widest truncate">{user?.jobTitle || (user?.role === 'ADMIN' ? 'Quản trị viên' : user?.role === 'MANAGER' ? 'Trưởng phòng' : 'Nhân viên')}</p>
                     </div>
                     <Link to="/dashboard/settings" className="p-2 rounded-xl text-muted-foreground hover:text-primary hover:bg-white/60 dark:hover:bg-white/10 transition-all shrink-0" title="Cài đặt">
                         <Settings className="w-4 h-4" />

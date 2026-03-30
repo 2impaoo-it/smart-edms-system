@@ -19,8 +19,8 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
 
     @Query("SELECT d FROM Document d WHERE d.isDeleted = false AND " +
            "(:folderId IS NULL OR d.folderId = :folderId) AND " +
-           "(:status IS NULL OR d.status = :status) AND " +
-           "(:name IS NULL OR LOWER(d.name) LIKE LOWER(CONCAT('%', :name, '%')))")
+           "(:status IS NULL OR CAST(:status as string) = '' OR d.status = :status) AND " +
+           "(CAST(:name as string) IS NULL OR CAST(:name as string) = '' OR LOWER(d.name) LIKE LOWER(CONCAT('%', CAST(:name as string), '%')))")
     Page<Document> searchDocuments(@Param("name") String name, 
                                    @Param("folderId") Long folderId, 
                                    @Param("status") com.smartedms.entity.DocumentStatus status, 

@@ -1,5 +1,6 @@
 package com.smartedms.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -22,8 +23,9 @@ public class User {
     @Column(unique = true, nullable = false)
     private String username;
 
+    @JsonIgnore // Không bao giờ trả về hash password qua API
     @Column(nullable = false)
-    private String password; // Mật khẩu đã được mã hóa bằng BCrypt
+    private String password;
 
     private String fullName;
     private String email;
@@ -33,10 +35,10 @@ public class User {
     @Column(name = "must_change_password", nullable = false)
     private boolean mustChangePassword = false;
 
-    @Column(name = "has_keystore", nullable = false)
+    @Column(name = "has_keystore", columnDefinition = "boolean default false")
     private boolean hasKeystore = false;
 
-    @Column(name = "is_active", nullable = false)
+    @Column(name = "is_active", columnDefinition = "boolean default true")
     private boolean isActive = true;
 
     @ElementCollection(fetch = FetchType.EAGER)

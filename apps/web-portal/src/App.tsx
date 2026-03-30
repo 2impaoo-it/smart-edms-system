@@ -9,6 +9,12 @@ import { ProtectedRoute } from "./components/layout/ProtectedRoute";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { Settings } from "./pages/Settings";
 import { Approvals } from "./pages/Approvals";
+import { UserManagement } from "./pages/UserManagement";
+import { SignatureManagement } from "./pages/SignatureManagement";
+import { RecycleBin } from "./pages/RecycleBin";
+import { SystemLogs } from "./pages/SystemLogs";
+import { StorageManagement } from "./pages/StorageManagement";
+
 const router = createBrowserRouter([
     {
         path: "/",
@@ -35,11 +41,11 @@ const router = createBrowserRouter([
                     },
                     {
                         path: "recycle-bin",
-                        element: <PlaceholderPage title="Thùng rác" />,
+                        element: <RecycleBin />,
                     },
                     {
                         path: "audit-logs",
-                        element: <PlaceholderPage title="Nhật ký Hệ thống (Audit Logs)" />,
+                        element: <SystemLogs />,
                     },
                     {
                         path: "approvals",
@@ -47,15 +53,15 @@ const router = createBrowserRouter([
                     },
                     {
                         path: "signatures",
-                        element: <PlaceholderPage title="Quản lý Chữ ký" />,
+                        element: <SignatureManagement />,
                     },
                     {
                         path: "users",
-                        element: <PlaceholderPage title="Quản lý Người dùng" />,
+                        element: <UserManagement />,
                     },
                     {
                         path: "storage",
-                        element: <PlaceholderPage title="Quản lý Lưu trữ" />,
+                        element: <StorageManagement />,
                     },
                     {
                         path: "settings",
@@ -77,12 +83,11 @@ function App() {
             <RouterProvider router={router} />
             <GooeyToaster 
                 position="bottom-right"
-                toastOptions={{
-                    className: "glass-panel bg-white/80 backdrop-blur-xl border border-white/60 shadow-[0_8px_32px_rgba(99,102,241,0.15)] font-bold",
-                    style: {
-                        borderRadius: "24px",
-                    }
-                }}
+                duration={4000}
+                theme="light"
+                richColors
+                visibleToasts={5}
+                closeButton
             />
         </>
     );

@@ -4,7 +4,15 @@ import type { UserRole } from "../../lib/types";
 import { FileExplorer } from "../../pages/FileExplorer";
 import { PlaceholderPage } from "../../pages/PlaceholderPage";
 import { AdminDashboard, ManagerDashboard, StaffDashboard } from "../../pages/Dashboard";
+import { Approvals } from "../../pages/Approvals";
+import { UserManagement } from "../../pages/UserManagement";
+import { StorageManagement } from "../../pages/StorageManagement";
+import { SystemLogs } from "../../pages/SystemLogs";
+import { Settings } from "../../pages/Settings";
+import { RecycleBin } from "../../pages/RecycleBin";
+import { SignatureManagement } from "../../pages/SignatureManagement";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
+import { gooeyToast as toast } from "goey-toast";
 
 export interface AppNotification {
     id: string;
@@ -21,25 +29,86 @@ export function MainLayout() {
     const [searchParams, setSearchParams] = useSearchParams();
 
     // Lấy thông tin user từ localStorage, đã được kiểm tra ở ProtectedRoute
-    const [currentUser] = useState<any>(() => {
+    const [currentUser, setCurrentUser] = useState<any>(() => {
         const stored = localStorage.getItem('user');
         return stored ? JSON.parse(stored) : null; 
     });
+
+    useEffect(() => {
+        const handleUserUpdate = () => {
+            const stored = localStorage.getItem('user');
+            if (stored) setCurrentUser(JSON.parse(stored));
+        };
+        window.addEventListener('user-updated', handleUserUpdate);
+        return () => window.removeEventListener('user-updated', handleUserUpdate);
+    }, []);
 
     const currentRole: UserRole = currentUser?.role || 'STAFF';
     
     const currentFolderId = searchParams.get('folder');
 
-    // --- REAL NOTIFICATIONS SYSTEM ---
-    const [notifications] = useState<AppNotification[]>([
-        { id: '1', title: 'Tài liệu mới', message: 'Tài liệu "Quy_Trinh_Bao_Mat_2024.pdf" vừa được tải lên kho phòng ban.', type: 'info', time: 'Vừa xong', isRead: false },
-        { id: '2', title: 'Cần phê duyệt', message: 'Bạn có 3 hợp đồng đang chờ chữ ký số.', type: 'warning', time: '1 giờ trước', isRead: false },
-        { id: '3', title: 'Thành công', message: 'Tiến trình sao lưu dữ liệu hệ thống đã hoàn tất.', type: 'success', time: '2 giờ trước', isRead: true },
-    ]);
+    // --- REAL-TIME NOTIFICATIONS SYSTEM ---
+    const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
-    // --- SECURITY: ADMIN CANNOT ACCESS PERSONAL FILES ---
     useEffect(() => {
-        if (currentRole === 'ADMIN' && location.pathname === '/dashboard/files') {
+        const stored = localStorage.getItem('token');
+        if (!stored || !currentUser) return;
+
+        // Fetch full user details to get real numeric ID if current id is a string (username)
+        import("../../services/userService").then(m => m.getOrgChart()).then(res => {
+            if (Array.isArray(res.data)) {
+                const fullInfo = res.data.find((u: any) => u.username === currentUser.username || u.username === currentUser.id);
+                if (fullInfo) {
+                    const updated = { ...currentUser, ...fullInfo };
+                    // Avoid redundant re-renders and localStorage writes if nothing changed
+                    if (JSON.stringify(updated) !== JSON.stringify(currentUser)) {
+                        localStorage.setItem('user', JSON.stringify(updated));
+                        setCurrentUser(updated);
+                        window.dispatchEvent(new Event('user-updated'));
+                    }
+                }
+            }
+        }).catch(console.error);
+
+        const socket = import("../../services/socketService").then(m => m.initSocket(currentUser.id));
+        
+        socket.then(s => {
+            if (!s) return;
+            
+            s.on("NOTIFICATION", (msg: string) => {
+                const newNotif: AppNotification = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    title: 'Thông báo mới',
+                    message: msg,
+                    type: 'info',
+                    time: 'Vừa xong',
+                    isRead: false
+                };
+                setNotifications(prev => [newNotif, ...prev]);
+                toast.info(msg);
+            });
+
+            s.on("new_audit_log", (log: any) => {
+                const newNotif: AppNotification = {
+                    id: log._id || Math.random().toString(36).substr(2, 9),
+                    title: 'Hành động hệ thống',
+                    message: `${log.actorName || 'Ai đó'} vừa thực hiện ${log.action}`,
+                    type: 'success',
+                    time: 'Vừa xong',
+                    isRead: false
+                };
+                setNotifications(prev => [newNotif, ...prev]);
+            });
+        });
+
+        return () => {
+            import("../../services/socketService").then(m => m.disconnectSocket());
+        };
+    }, [currentUser]);
+
+    // --- SECURITY: ADMIN CANNOT ACCESS PERSONAL/DEPARTMENT FILES ---
+    useEffect(() => {
+        if (currentRole === 'ADMIN' && (location.pathname === '/dashboard/files' || location.pathname === '/dashboard/department')) {
             navigate('/dashboard', { replace: true });
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -70,13 +139,13 @@ export function MainLayout() {
             return <FileExplorer title="Kho phòng ban" currentFolderId={currentFolderId} onFolderChange={handleFolderChange} ownerId={null} user={currentUser} folderType="DEPARTMENT" />;
         }
 
-        if (location.pathname === '/dashboard/recycle-bin') return <PlaceholderPage title="Thùng rác" />;
-        if (location.pathname === '/dashboard/audit-logs') return <PlaceholderPage title="Nhật ký Hệ thống" />;
-        if (location.pathname === '/dashboard/approvals') return <PlaceholderPage title="Quản lý Phê duyệt" />;
-        if (location.pathname === '/dashboard/signatures') return <PlaceholderPage title="Quản lý Chữ ký" />;
-        if (location.pathname === '/dashboard/users') return <PlaceholderPage title="Quản lý Người dùng" />;
-        if (location.pathname === '/dashboard/storage') return <PlaceholderPage title="Quản lý Lưu trữ" />;
-        if (location.pathname === '/dashboard/settings') return <PlaceholderPage title="Cài đặt Hệ thống" />;
+        if (location.pathname === '/dashboard/recycle-bin') return <RecycleBin />;
+        if (location.pathname === '/dashboard/audit-logs') return <SystemLogs />;
+        if (location.pathname === '/dashboard/approvals') return <Approvals />;
+        if (location.pathname === '/dashboard/signatures') return <SignatureManagement />;
+        if (location.pathname === '/dashboard/users') return <UserManagement />;
+        if (location.pathname === '/dashboard/storage') return <StorageManagement />;
+        if (location.pathname === '/dashboard/settings') return <Settings />;
         
         if (location.pathname === '/dashboard' || location.pathname === '/dashboard/') {
             if (currentRole === 'ADMIN') return <AdminDashboard user={currentUser} onNavigate={navigate} />;
