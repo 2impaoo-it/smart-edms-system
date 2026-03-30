@@ -28,7 +28,7 @@ public class SystemHealthController {
     private String defaultBucket;
 
     @GetMapping
-    @Operation(summary = "Kiểm tra sức khỏe hệ thống", description = "Trả về trạng thái của Spring Boot, Database, MinIO, Kafka.")
+    @Operation(summary = "Kiểm tra sức khỏe hệ thống", description = "Trả về trạng thái của Spring Boot, Database, MinIO.")
     public Map<String, String> getHealth() {
         Map<String, String> health = new HashMap<>();
         
@@ -47,8 +47,6 @@ public class SystemHealthController {
         } catch (Exception e) {
             health.put("minio", "DOWN");
         }
-        
-        health.put("kafka", "UP"); // Kafka is maintained by Spring Kafka consumer/producer under the hood
 
         return health;
     }

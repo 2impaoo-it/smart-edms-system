@@ -121,8 +121,9 @@ public class DocumentController {
     @DeleteMapping("/{id}")
     @Operation(summary = "Xóa tài liệu", description = "Xóa mềm (soft delete) tài liệu theo id", security = @SecurityRequirement(name = "bearerAuth"))
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable Long id) {
-        documentService.softDelete(id);
+    public void delete(@PathVariable Long id, @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        documentService.softDelete(id, userId);
     }
 
     @PostMapping(value = "/{id}/sign", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -200,21 +201,24 @@ public class DocumentController {
 
     @GetMapping("/trash")
     @Operation(summary = "Danh sách tài liệu đã xóa", description = "Lấy các tài liệu trong thùng rác", security = @SecurityRequirement(name = "bearerAuth"))
-    public List<Document> getDeletedDocuments() {
-        return documentService.getDeletedDocuments();
+    public List<Document> getDeletedDocuments(@AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return documentService.getDeletedDocuments(userId);
     }
 
     @PutMapping("/{id}/restore")
     @Operation(summary = "Khôi phục tài liệu", description = "Khôi phục tài liệu từ thùng rác", security = @SecurityRequirement(name = "bearerAuth"))
-    public Document restoreDocument(@PathVariable Long id) {
-        return documentService.restoreDocument(id);
+    public Document restoreDocument(@PathVariable Long id, @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return documentService.restoreDocument(id, userId);
     }
 
     @DeleteMapping("/{id}/hard-delete")
     @Operation(summary = "Xóa vĩnh viễn tài liệu", description = "Xóa vĩnh viễn tài liệu và các file vật lý trên MinIO", security = @SecurityRequirement(name = "bearerAuth"))
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void hardDeleteDocument(@PathVariable Long id) {
-        documentService.hardDeleteDocument(id);
+    public void hardDeleteDocument(@PathVariable Long id, @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        documentService.hardDeleteDocument(id, userId);
     }
 
 }

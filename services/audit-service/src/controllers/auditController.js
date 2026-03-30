@@ -1,5 +1,4 @@
 const AuditLog = require('../models/AuditLog');
-const { isKafkaConnected } = require('../kafkaConsumer');
 
 const createLog = async (req, res) => {
   try {
@@ -91,15 +90,13 @@ const getHealth = async (req, res) => {
     const mongoose = require('mongoose');
     const mongoStatus = mongoose.connection.readyState === 1 ? 'UP' : 'DOWN';
     const socketStatus = req.io ? 'UP' : 'DOWN';
-    const kafkaStatus = isKafkaConnected() ? 'UP' : 'DOWN';
 
     res.status(200).json({
       service: 'Audit Service',
       status: 'UP',
       details: {
         mongodb: mongoStatus,
-        socketio: socketStatus,
-        kafka: kafkaStatus
+        socketio: socketStatus
       }
     });
   } catch (error) {

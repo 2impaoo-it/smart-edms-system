@@ -56,6 +56,14 @@ public class DocumentSigningService {
         DocumentVersion currentVersion = documentVersionRepository.findByDocumentIdAndIsCurrentTrue(documentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document version not found"));
 
+        if (document.getStatus() != com.smartedms.entity.DocumentStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tài liệu không ở trạng thái chờ duyệt");
+        }
+
+        if (!userId.equals(document.getApproverId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không phải là người được chỉ định phê duyệt tài liệu này");
+        }
+
         try {
             // 1. Giải mã khóa P12
             DigitalSignatureService.KeyStoreData keyStoreData = digitalSignatureService.extractKeyStoreData(p12Stream, password);
