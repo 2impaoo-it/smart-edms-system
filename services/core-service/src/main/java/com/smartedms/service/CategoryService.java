@@ -132,6 +132,7 @@ public class CategoryService {
      * Tạo thư mục mới, gán ownerId = user hiện tại.
      * Nếu tạo thư mục con trong thư mục phòng ban, tự kế thừa folderType từ cha.
      */
+    @Transactional
     public Category create(CategoryRequestDTO dto, Long userId) {
         Category category = new Category();
         category.setName(dto.getName());
@@ -158,7 +159,7 @@ public class CategoryService {
                 User currentUser = userRepository.findById(userId)
                         .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
                 if (!currentUser.getRoles().contains(Role.ROLE_MANAGER) && !currentUser.getRoles().contains(Role.ROLE_ADMIN)) {
-                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ Manager hoặc Admin mới được tạo thư mục phòng ban");
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ Manager hoặc Admin mới được tạo thư mục phòng ban căn bản");
                 }
             }
 
@@ -167,7 +168,7 @@ public class CategoryService {
 
         category = folderRepository.save(category);
 
-        // Audit log – fault tolerant: không để lỗi Kafka/SecurityContext làm rollback thao tác chính
+        // Audit log – fault tolerant
         try {
             String username = org.springframework.security.core.context.SecurityContextHolder
                     .getContext().getAuthentication().getName();

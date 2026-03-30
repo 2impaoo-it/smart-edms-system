@@ -302,10 +302,16 @@ public class DocumentService {
     @Transactional
     public Document uploadPdf(MultipartFile file, Long folderId, Long userId) {
         validateSupportedFormat(file);
+        
+        // CHỈNH SỬA: Cấm upload lên root theo yêu cầu của user
+        if (folderId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vui lòng chọn thư mục. Không được phép upload tài liệu lên thư mục gốc.");
+        }
+        
         validateFolder(folderId);
 
         // Kiểm tra quyền EDITOR trên thư mục đích
-        if (folderId != null && !permissionService.hasMinimumPermission(userId, folderId, PermissionLevel.EDITOR)) {
+        if (!permissionService.hasMinimumPermission(userId, folderId, PermissionLevel.EDITOR)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền upload vào thư mục này");
         }
 
@@ -324,6 +330,10 @@ public class DocumentService {
             String storedFileName = buildStoredFileName(safePdfName);
             String objectKey = buildObjectKey(folderId, storedFileName);
 
+            // Kiểm tra và đảm bảo bucket tồn tại
+            if (defaultBucket == null || defaultBucket.isBlank()) {
+                throw new IllegalStateException("MinIO bucket name is not configured in application.properties");
+            }
             ensureBucketExists(defaultBucket);
 
             minioClient.putObject(
