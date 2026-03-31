@@ -757,7 +757,7 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
                             </div>
                             <div className="flex-1 bg-slate-200/50 dark:bg-slate-950/50 flex items-center justify-center p-8 overflow-auto">
                                 <iframe 
-                                    src={`https://pseudoeconomical-loise-interpolable.ngrok-free.dev/api/documents/${fileToView.id}/view`} 
+                                    src={`https://vincent-electrosynthetic-lisa.ngrok-free.dev/api/documents/${fileToView.id}/view`} 
                                     className="w-full h-full rounded-xl shadow-xl border-0 bg-white" 
                                     title="PDF Viewer" 
                                 />
