@@ -30,9 +30,11 @@ interface SidebarProps {
     role: UserRole;
     user: any;
     notifications: any[];
+    onMarkAllRead: () => void;
+    onNotificationClick: (notif: any) => void;
 }
 
-export function Sidebar({ role, user, notifications }: SidebarProps) {
+export function Sidebar({ role, user, notifications, onMarkAllRead, onNotificationClick }: SidebarProps) {
     const location = useLocation();
     const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
     const [showNotifications, setShowNotifications] = useState(false);
@@ -148,7 +150,7 @@ export function Sidebar({ role, user, notifications }: SidebarProps) {
                         <div className="relative" onClick={(e) => e.stopPropagation()}>
                             <button 
                                 onClick={() => setShowNotifications(!showNotifications)} 
-                                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/30 transition-all shadow-sm"
+                                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/30 transition-all shadow-sm relative"
                             >
                                 <Bell className="w-3.5 h-3.5" />
                                 {unreadCount > 0 && (
@@ -164,7 +166,6 @@ export function Sidebar({ role, user, notifications }: SidebarProps) {
                                         exit={{ opacity: 0, x: -10, scale: 0.95 }}
                                         className="absolute left-[calc(100%+24px)] top-0 w-80 glass-panel rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border-2 border-slate-200 dark:border-slate-800 bg-white/98 dark:bg-slate-900/98 overflow-visible z-[100]"
                                     >
-                                        {/* The Triangle Pointer - Positioned at the top header area */}
                                         <div className="absolute top-[14px] -left-[14px] w-0 h-0 border-y-[10px] border-y-transparent border-r-[14px] border-r-slate-200 dark:border-r-slate-800" />
                                         <div className="absolute top-[14px] -left-[11px] w-0 h-0 border-y-[10px] border-y-transparent border-r-[14px] border-r-white dark:border-r-slate-900 z-10" />
 
@@ -181,12 +182,16 @@ export function Sidebar({ role, user, notifications }: SidebarProps) {
                                             ) : (
                                                 <div className="space-y-1">
                                                     {notifications.map(n => (
-                                                        <div key={n.id} className={cn(
-                                                            "p-3 rounded-2xl transition-colors hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer flex gap-3",
-                                                            !n.isRead ? "bg-slate-50 dark:bg-white/5" : "opacity-70"
-                                                        )}>
+                                                        <div 
+                                                            key={n.id} 
+                                                            onClick={() => onNotificationClick(n)}
+                                                            className={cn(
+                                                                "p-3 rounded-2xl transition-all duration-300 hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer flex gap-3 group",
+                                                                !n.isRead ? "bg-slate-50 dark:bg-white/5 shadow-sm" : "opacity-60"
+                                                            )}
+                                                        >
                                                             <div className={cn(
-                                                                "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                                                                "w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-transform group-hover:scale-110",
                                                                 n.type === 'info' ? "bg-blue-100 text-blue-600" :
                                                                 n.type === 'warning' ? "bg-amber-100 text-amber-600" :
                                                                 n.type === 'error' ? "bg-red-100 text-red-600" :
@@ -199,23 +204,24 @@ export function Sidebar({ role, user, notifications }: SidebarProps) {
                                                             </div>
                                                             <div className="flex-1 min-w-0">
                                                                 <div className="flex justify-between items-start mb-0.5">
-                                                                    <h4 className={cn("text-sm truncate", !n.isRead ? "font-bold text-slate-800 dark:text-slate-200" : "font-semibold text-slate-600 dark:text-slate-400")}>{n.title}</h4>
-                                                                    {!n.isRead && <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1.5 ml-2"></span>}
+                                                                    <h4 className={cn("text-xs truncate", !n.isRead ? "font-black text-slate-800 dark:text-slate-100" : "font-bold text-slate-600 dark:text-slate-400")}>{n.title}</h4>
+                                                                    {!n.isRead && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mt-1.5 ml-2 shadow-neon"></span>}
                                                                 </div>
-                                                                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{n.message}</p>
-                                                                <p className="text-[10px] font-bold text-muted-foreground/60 uppercase mt-1">{n.time}</p>
+                                                                <p className="text-[10px] font-medium text-muted-foreground line-clamp-2 leading-relaxed italic">{n.message}</p>
+                                                                <p className="text-[8px] font-black text-muted-foreground/40 uppercase mt-1 tracking-tighter">{n.time}</p>
                                                             </div>
                                                         </div>
                                                     ))}
                                                     <div className="p-2 border-t border-slate-100 dark:border-slate-800 mt-2">
                                                         <button 
-                                                            onClick={() => {
-                                                                setShowNotifications(false);
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onMarkAllRead();
                                                                 toast.success("Thành công", { description: "Đã đánh dấu đọc tất cả thông báo" });
                                                             }}
-                                                            className="w-full py-2.5 rounded-xl text-xs font-bold text-primary bg-primary/10 hover:bg-primary hover:text-white transition-colors flex items-center justify-center gap-2"
+                                                            className="w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-primary bg-primary/10 hover:bg-primary hover:text-white transition-all flex items-center justify-center gap-2"
                                                         >
-                                                            <Check className="w-4 h-4" /> Đánh dấu đã đọc
+                                                            <Check className="w-3.5 h-3.5" /> Đánh dấu đã đọc
                                                         </button>
                                                     </div>
                                                 </div>
