@@ -5,6 +5,7 @@ import { generateKeystore } from '../services/signatureService';
 import { useNavigate } from 'react-router';
 import { cn } from '../lib/utils';
 import axiosClient from '../lib/axiosClient';
+import { disconnectSocket } from '../services/socketService';
 
 export const Settings = () => {
     const [user, setUser] = useState<any>(null);
@@ -140,6 +141,7 @@ export const Settings = () => {
                 </div>
                 <button
                     onClick={() => {
+                        disconnectSocket();
                         localStorage.removeItem('token');
                         localStorage.removeItem('user');
                         toast.success('Đã đăng xuất', { description: 'Hẹn gặp lại bạn!' });

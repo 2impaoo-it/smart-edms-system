@@ -14,13 +14,17 @@ import { SignatureManagement } from "../../pages/SignatureManagement";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { gooeyToast as toast } from "goey-toast";
 
-export interface AppNotification {
+import { initSocket, disconnectSocket } from "../../services/socketService";
+
+interface AppNotification {
     id: string;
     title: string;
     message: string;
     type: 'info' | 'warning' | 'error' | 'success';
     time: string;
     isRead: boolean;
+    category?: 'DOCUMENT' | 'FEED' | 'SYSTEM' | 'AUTH';
+    targetId?: string;
 }
 
 export function MainLayout() {
@@ -28,7 +32,6 @@ export function MainLayout() {
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // Lấy thông tin user từ localStorage, đã được kiểm tra ở ProtectedRoute
     const [currentUser, setCurrentUser] = useState<any>(() => {
         const stored = localStorage.getItem('user');
         return stored ? JSON.parse(stored) : null; 
@@ -44,23 +47,40 @@ export function MainLayout() {
     }, []);
 
     const currentRole: UserRole = currentUser?.role || 'STAFF';
-    
     const currentFolderId = searchParams.get('folder');
 
-    // --- REAL-TIME NOTIFICATIONS SYSTEM ---
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
+
+    const addNotification = (notif: Partial<AppNotification>) => {
+        const newNotif: AppNotification = {
+            id: Math.random().toString(36).substr(2, 9),
+            title: notif.title || 'Thông báo',
+            message: notif.message || '',
+            type: notif.type || 'info',
+            time: 'Vừa xong',
+            isRead: false,
+            category: notif.category,
+            targetId: notif.targetId
+        };
+        setNotifications(prev => [newNotif, ...prev]);
+        
+        // Show toast based on type
+        if (newNotif.type === 'success') toast.success(newNotif.title, { description: newNotif.message });
+        else if (newNotif.type === 'error') toast.error(newNotif.title, { description: newNotif.message });
+        else if (newNotif.type === 'warning') toast.warning(newNotif.title, { description: newNotif.message });
+        else toast.info(newNotif.title, { description: newNotif.message });
+    };
 
     useEffect(() => {
         const stored = localStorage.getItem('token');
         if (!stored || !currentUser) return;
 
-        // Fetch full user details to get real numeric ID if current id is a string (username)
+        // Sync user info
         import("../../services/userService").then(m => m.getOrgChart()).then(res => {
             if (Array.isArray(res.data)) {
                 const fullInfo = res.data.find((u: any) => u.username === currentUser.username || u.username === currentUser.id);
                 if (fullInfo) {
                     const updated = { ...currentUser, ...fullInfo };
-                    // Avoid redundant re-renders and localStorage writes if nothing changed
                     if (JSON.stringify(updated) !== JSON.stringify(currentUser)) {
                         localStorage.setItem('user', JSON.stringify(updated));
                         setCurrentUser(updated);
@@ -70,41 +90,113 @@ export function MainLayout() {
             }
         }).catch(console.error);
 
-        const socket = import("../../services/socketService").then(m => m.initSocket(currentUser.id));
+        const s = initSocket(currentUser.id);
         
-        socket.then(s => {
-            if (!s) return;
-            
+        if (s) {
+            // --- COMMON EVENTS ---
             s.on("NOTIFICATION", (msg: string) => {
-                const newNotif: AppNotification = {
-                    id: Math.random().toString(36).substr(2, 9),
-                    title: 'Thông báo mới',
-                    message: msg,
-                    type: 'info',
-                    time: 'Vừa xong',
-                    isRead: false
-                };
-                setNotifications(prev => [newNotif, ...prev]);
-                toast.info(msg);
+                addNotification({ title: 'Hệ thống', message: msg, type: 'info' });
             });
 
-            s.on("new_audit_log", (log: any) => {
-                const newNotif: AppNotification = {
-                    id: log._id || Math.random().toString(36).substr(2, 9),
-                    title: 'Hành động hệ thống',
-                    message: `${log.actorName || 'Ai đó'} vừa thực hiện ${log.action}`,
-                    type: 'success',
-                    time: 'Vừa xong',
-                    isRead: false
-                };
-                setNotifications(prev => [newNotif, ...prev]);
-            });
-        });
+            // --- ROLE-BASED EVENTS ---
+            if (currentRole === 'STAFF') {
+                s.on("DOCUMENT_APPROVED", (data: any) => {
+                    addNotification({ 
+                        title: 'Tài liệu đã được duyệt', 
+                        message: `Tài liệu "${data.name}" của bạn đã được phê duyệt bởi ${data.approverName}`,
+                        type: 'success',
+                        category: 'DOCUMENT',
+                        targetId: data.id
+                    });
+                });
+                s.on("DOCUMENT_SIGNED", (data: any) => {
+                    addNotification({ 
+                        title: 'Tài liệu đã ký số', 
+                        message: `Tài liệu "${data.name}" đã hoàn tất việc ký số.`,
+                        type: 'success',
+                        category: 'DOCUMENT',
+                        targetId: data.id
+                    });
+                });
+                s.on("NEW_FEED_POST", (data: any) => {
+                    addNotification({ 
+                        title: 'Bảng tin mới', 
+                        message: `${data.authorName} vừa đăng một bài viết mới: "${data.title}"`,
+                        type: 'info',
+                        category: 'FEED',
+                        targetId: data.id
+                    });
+                });
+            }
 
+            if (currentRole === 'MANAGER') {
+                s.on("PENDING_APPROVAL_REQUEST", (data: any) => {
+                    addNotification({ 
+                        title: 'Yêu cầu phê duyệt mới', 
+                        message: `Nhân viên ${data.staffName} vừa trình ký tài liệu: ${data.documentName}`,
+                        type: 'warning',
+                        category: 'DOCUMENT',
+                        targetId: data.id
+                    });
+                });
+                s.on("FEED_INTERACTION", (data: any) => {
+                    addNotification({ 
+                        title: 'Tương tác bảng tin', 
+                        message: `${data.userName} vừa ${data.action} bài viết của bạn.`,
+                        type: 'info',
+                        category: 'FEED',
+                        targetId: data.postId
+                    });
+                });
+            }
+
+            if (currentRole === 'ADMIN') {
+                s.on("new_audit_log", (log: any) => {
+                    addNotification({ 
+                        id: log._id,
+                        title: 'Nhật ký hệ thống',
+                        message: `[${log.category}] ${log.actorName || 'Hệ thống'} thực hiện: ${log.action}`,
+                        type: 'info',
+                        category: 'SYSTEM'
+                    });
+                });
+                s.on("SECURITY_ALERT", (data: any) => {
+                    addNotification({ 
+                        title: 'Cảnh báo bảo mật', 
+                        message: data.message,
+                        type: 'error',
+                        category: 'SYSTEM'
+                    });
+                });
+            }
+        }
+
+        // Hủy bỏ việc tự động disconnect socket khi unmount component
+        // Vì StrictMode chạy mount->unmount->mount có thể gây lỗi race condition làm ngắt kết nối WebSocket hiện tại.
         return () => {
-            import("../../services/socketService").then(m => m.disconnectSocket());
+            if (s) {
+                s.off("NOTIFICATION");
+                s.off("DOCUMENT_APPROVED");
+                s.off("DOCUMENT_SIGNED");
+                s.off("NEW_FEED_POST");
+                s.off("PENDING_APPROVAL_REQUEST");
+                s.off("FEED_INTERACTION");
+                s.off("new_audit_log");
+                s.off("SECURITY_ALERT");
+            }
         };
-    }, [currentUser]);
+    }, [currentUser, currentRole]);
+
+    const handleMarkAllRead = () => {
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    };
+
+    const handleNotificationClick = (notif: AppNotification) => {
+        setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
+        if (notif.category === 'DOCUMENT') navigate('/dashboard/approvals');
+        if (notif.category === 'FEED') navigate('/dashboard');
+        if (notif.category === 'SYSTEM') navigate('/dashboard/audit-logs');
+    };
 
     // --- SECURITY: ADMIN CANNOT ACCESS PERSONAL/DEPARTMENT FILES ---
     useEffect(() => {
@@ -160,7 +252,13 @@ export function MainLayout() {
         <div className="flex h-screen overflow-hidden selection:bg-primary/20 selection:text-primary transition-colors duration-300 bg-slate-50 dark:bg-slate-950 relative">
             
             {/* Sidebar is now always visible */}
-            <Sidebar role={currentRole} user={currentUser} notifications={notifications} />
+            <Sidebar 
+                role={currentRole} 
+                user={currentUser} 
+                notifications={notifications} 
+                onMarkAllRead={handleMarkAllRead}
+                onNotificationClick={handleNotificationClick}
+            />
 
             {/* Main Content */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">

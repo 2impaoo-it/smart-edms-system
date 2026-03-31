@@ -113,9 +113,52 @@ export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: 
 
         getPosts().then(res => setPosts(res.data || [])).catch(console.error);
         
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const socket = initSocket(storedUser.id || 'admin');
+
+        const handleNewPost = (post: any) => {
+            console.log("🔥 [Socket] Nhận sự kiện NEW_POST:", post);
+            setPosts(prev => [post, ...prev]);
+        };
+        const handlePostUpdated = ({ postId, likesCount, likes }: any) => {
+            console.log("🔥 [Socket] Nhận sự kiện POST_UPDATED:", { postId, likesCount });
+            setPosts(prev => prev.map(p => 
+                (p._id === postId || p.id === postId) 
+                ? { ...p, likesCount, likes } 
+                : p
+            ));
+        };
+        const handleNewComment = ({ postId, comment }: any) => {
+            console.log("🔥 [Socket] Nhận sự kiện NEW_COMMENT:", { postId, comment });
+            setPosts(prev => prev.map(p => 
+                (p._id === postId || p.id === postId) 
+                ? { ...p, comments: [...(p.comments || []), comment] } 
+                : p
+            ));
+        };
+
+        if (socket) {
+            socket.on("NEW_POST", handleNewPost);
+            socket.on("POST_UPDATED", handlePostUpdated);
+            socket.on("NEW_COMMENT", handleNewComment);
+            
+            // Lắng nghe tất cả sự kiện để debug
+            socket.onAny((eventName, ...args) => {
+                console.log(`[Socket Debug] Event: ${eventName}`, args);
+            });
+        }
+        
         import("../services/userService").then(m => m.getOrgChart()).then(res => {
             if (Array.isArray(res.data)) setTotalUsers(res.data.length);
         }).catch(console.error);
+
+        return () => {
+            if (socket) {
+                socket.off("NEW_POST", handleNewPost);
+                socket.off("POST_UPDATED", handlePostUpdated);
+                socket.off("NEW_COMMENT", handleNewComment);
+            }
+        };
     }, []);
 
     const statusData = [
@@ -490,12 +533,41 @@ export function ManagerDashboard({ user, onNavigate }: { user: any, onNavigate: 
         getPosts().then(res => setPosts(res.data || [])).catch(console.error);
 
         const socket = initSocket(safeUser.id);
+        
+        const handleNewPost = (post: any) => {
+            console.log("🔥 [Manager Socket] Nhận sự kiện NEW_POST:", post);
+            setPosts(prev => [post, ...prev]);
+        };
+        const handlePostUpdated = ({ postId, likesCount, likes }: any) => {
+            console.log("🔥 [Manager Socket] Nhận sự kiện POST_UPDATED");
+            setPosts(prev => prev.map(p => 
+                (p._id === postId || p.id === postId) 
+                ? { ...p, likesCount, likes } 
+                : p
+            ));
+        };
+        const handleNewComment = ({ postId, comment }: any) => {
+            console.log("🔥 [Manager Socket] Nhận sự kiện NEW_COMMENT");
+            setPosts(prev => prev.map(p => 
+                (p._id === postId || p.id === postId) 
+                ? { ...p, comments: [...(p.comments || []), comment] } 
+                : p
+            ));
+        };
+        
         if (socket) {
-            socket.on("NEW_POST", (post) => {
-                setPosts(prev => [post, ...prev]);
-            });
+            socket.on("NEW_POST", handleNewPost);
+            socket.on("POST_UPDATED", handlePostUpdated);
+            socket.on("NEW_COMMENT", handleNewComment);
+            socket.onAny((ev, ...args) => console.log(`[Socket Manager Debug] ${ev}`, args));
         }
-        return () => disconnectSocket();
+        return () => {
+            if (socket) {
+                socket.off("NEW_POST", handleNewPost);
+                socket.off("POST_UPDATED", handlePostUpdated);
+                socket.off("NEW_COMMENT", handleNewComment);
+            }
+        };
     }, [safeUser.id]);
 
     const handleCreatePost = async (e: React.FormEvent) => {
@@ -912,10 +984,41 @@ export function StaffDashboard({ user, onNavigate }: { user: any, onNavigate: (p
             }
         }).catch(console.error);
         const socket = initSocket(safeUser.id);
-        if (socket) {
-            socket.on("NEW_POST", (post) => setPosts(prev => [post, ...prev]));
+        
+        const handleNewPost = (post: any) => {
+            console.log("🔥 [Staff Socket] Nhận sự kiện NEW_POST:", post);
+            setPosts(prev => [post, ...prev]);
         }
-        return () => disconnectSocket();
+        const handlePostUpdated = ({ postId, likesCount, likes }: any) => {
+            console.log("🔥 [Staff Socket] Nhận sự kiện POST_UPDATED");
+            setPosts(prev => prev.map(p => 
+                (p._id === postId || p.id === postId) 
+                ? { ...p, likesCount, likes } 
+                : p
+            ));
+        };
+        const handleNewComment = ({ postId, comment }: any) => {
+            console.log("🔥 [Staff Socket] Nhận sự kiện NEW_COMMENT");
+            setPosts(prev => prev.map(p => 
+                (p._id === postId || p.id === postId) 
+                ? { ...p, comments: [...(p.comments || []), comment] } 
+                : p
+            ));
+        };
+        
+        if (socket) {
+            socket.on("NEW_POST", handleNewPost);
+            socket.on("POST_UPDATED", handlePostUpdated);
+            socket.on("NEW_COMMENT", handleNewComment);
+            socket.onAny((ev, ...args) => console.log(`[Socket Staff Debug] ${ev}`, args));
+        }
+        return () => {
+            if (socket) {
+                socket.off("NEW_POST", handleNewPost);
+                socket.off("POST_UPDATED", handlePostUpdated);
+                socket.off("NEW_COMMENT", handleNewComment);
+            }
+        };
     }, [safeUser.id]);
 
     const handleLike = async (postId: number | string) => {
