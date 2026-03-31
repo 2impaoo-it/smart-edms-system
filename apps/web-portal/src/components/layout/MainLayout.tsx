@@ -92,97 +92,94 @@ export function MainLayout() {
 
         const s = initSocket(currentUser.id);
         
+        // Define listeners with references so we can remove them specifically without breaking other components
+        const handleSysNotification = (msg: string) => {
+            addNotification({ title: 'Hệ thống', message: msg, type: 'info' });
+        };
+        const handleNewPost = (data: any) => {
+            if (data.authorId !== currentUser.id && data.authorId !== Number(currentUser.id)) {
+                addNotification({ 
+                    title: 'Bảng tin mới', 
+                    message: `${data.authorName || 'Một người'} vừa đăng bài viết mới.`,
+                    type: 'info',
+                    category: 'FEED',
+                    targetId: data._id || data.id
+                });
+            }
+        };
+        const handleNewComment = ({ postId, comment }: any) => {
+            if (comment.userId !== currentUser.id && comment.userId !== Number(currentUser.id)) {
+                addNotification({ 
+                    title: 'Bình luận mới', 
+                    message: `${comment.userName || 'Ai đó'} vừa bình luận.`,
+                    type: 'info',
+                    category: 'FEED',
+                    targetId: postId
+                });
+            }
+        };
+        const handleAuditLog = (log: any) => {
+            if (currentRole === 'ADMIN') {
+                addNotification({ 
+                    id: log._id,
+                    title: 'Nhật ký hệ thống',
+                    message: `[${log.category}] ${log.actorName || 'Hệ thống'} thực hiện: ${log.action}`,
+                    type: 'info',
+                    category: 'SYSTEM'
+                });
+            }
+        };
+
+        // Fallback for mocked Spring Boot events until backend is fully integrated
+        const handleDocApproved = (data: any) => {
+            addNotification({ 
+                title: 'Tài liệu đã được duyệt', 
+                message: `Tài liệu "${data.name}" của bạn đã được phê duyệt bởi ${data.approverName}`,
+                type: 'success',category: 'DOCUMENT',targetId: data.id
+            });
+        };
+        const handleDocSigned = (data: any) => {
+            addNotification({ 
+                title: 'Tài liệu đã ký số', 
+                message: `Tài liệu "${data.name}" đã hoàn tất việc ký số.`,
+                type: 'success', category: 'DOCUMENT', targetId: data.id
+            });
+        };
+        const handlePendingApproval = (data: any) => {
+            addNotification({ 
+                title: 'Yêu cầu phê duyệt mới', 
+                message: `Nhân viên ${data.staffName} vừa trình ký tài liệu: ${data.documentName}`,
+                type: 'warning', category: 'DOCUMENT', targetId: data.id
+            });
+        };
+
         if (s) {
             // --- COMMON EVENTS ---
-            s.on("NOTIFICATION", (msg: string) => {
-                addNotification({ title: 'Hệ thống', message: msg, type: 'info' });
-            });
+            s.on("NOTIFICATION", handleSysNotification);
+            s.on("NEW_POST", handleNewPost);
+            s.on("NEW_COMMENT", handleNewComment);
+            s.on("new_audit_log", handleAuditLog);
 
-            // --- ROLE-BASED EVENTS ---
+            // --- ROLE-BASED EVENTS (Chờ ghép Spring Boot Realtime sau) ---
             if (currentRole === 'STAFF') {
-                s.on("DOCUMENT_APPROVED", (data: any) => {
-                    addNotification({ 
-                        title: 'Tài liệu đã được duyệt', 
-                        message: `Tài liệu "${data.name}" của bạn đã được phê duyệt bởi ${data.approverName}`,
-                        type: 'success',
-                        category: 'DOCUMENT',
-                        targetId: data.id
-                    });
-                });
-                s.on("DOCUMENT_SIGNED", (data: any) => {
-                    addNotification({ 
-                        title: 'Tài liệu đã ký số', 
-                        message: `Tài liệu "${data.name}" đã hoàn tất việc ký số.`,
-                        type: 'success',
-                        category: 'DOCUMENT',
-                        targetId: data.id
-                    });
-                });
-                s.on("NEW_FEED_POST", (data: any) => {
-                    addNotification({ 
-                        title: 'Bảng tin mới', 
-                        message: `${data.authorName} vừa đăng một bài viết mới: "${data.title}"`,
-                        type: 'info',
-                        category: 'FEED',
-                        targetId: data.id
-                    });
-                });
+                s.on("DOCUMENT_APPROVED", handleDocApproved);
+                s.on("DOCUMENT_SIGNED", handleDocSigned);
             }
 
             if (currentRole === 'MANAGER') {
-                s.on("PENDING_APPROVAL_REQUEST", (data: any) => {
-                    addNotification({ 
-                        title: 'Yêu cầu phê duyệt mới', 
-                        message: `Nhân viên ${data.staffName} vừa trình ký tài liệu: ${data.documentName}`,
-                        type: 'warning',
-                        category: 'DOCUMENT',
-                        targetId: data.id
-                    });
-                });
-                s.on("FEED_INTERACTION", (data: any) => {
-                    addNotification({ 
-                        title: 'Tương tác bảng tin', 
-                        message: `${data.userName} vừa ${data.action} bài viết của bạn.`,
-                        type: 'info',
-                        category: 'FEED',
-                        targetId: data.postId
-                    });
-                });
-            }
-
-            if (currentRole === 'ADMIN') {
-                s.on("new_audit_log", (log: any) => {
-                    addNotification({ 
-                        id: log._id,
-                        title: 'Nhật ký hệ thống',
-                        message: `[${log.category}] ${log.actorName || 'Hệ thống'} thực hiện: ${log.action}`,
-                        type: 'info',
-                        category: 'SYSTEM'
-                    });
-                });
-                s.on("SECURITY_ALERT", (data: any) => {
-                    addNotification({ 
-                        title: 'Cảnh báo bảo mật', 
-                        message: data.message,
-                        type: 'error',
-                        category: 'SYSTEM'
-                    });
-                });
+                s.on("PENDING_APPROVAL_REQUEST", handlePendingApproval);
             }
         }
 
-        // Hủy bỏ việc tự động disconnect socket khi unmount component
-        // Vì StrictMode chạy mount->unmount->mount có thể gây lỗi race condition làm ngắt kết nối WebSocket hiện tại.
         return () => {
             if (s) {
-                s.off("NOTIFICATION");
-                s.off("DOCUMENT_APPROVED");
-                s.off("DOCUMENT_SIGNED");
-                s.off("NEW_FEED_POST");
-                s.off("PENDING_APPROVAL_REQUEST");
-                s.off("FEED_INTERACTION");
-                s.off("new_audit_log");
-                s.off("SECURITY_ALERT");
+                s.off("NOTIFICATION", handleSysNotification);
+                s.off("NEW_POST", handleNewPost);
+                s.off("NEW_COMMENT", handleNewComment);
+                s.off("new_audit_log", handleAuditLog);
+                s.off("DOCUMENT_APPROVED", handleDocApproved);
+                s.off("DOCUMENT_SIGNED", handleDocSigned);
+                s.off("PENDING_APPROVAL_REQUEST", handlePendingApproval);
             }
         };
     }, [currentUser, currentRole]);
