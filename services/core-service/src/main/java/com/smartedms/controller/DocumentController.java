@@ -143,6 +143,16 @@ public class DocumentController {
         }
     }
 
+    @PostMapping(value = "/{id}/visual-sign")
+    @Operation(summary = "Ký tươi tài liệu (Visual Signature)", description = "Đóng dấu ảnh chữ ký lên bản PDF và duyệt", security = @SecurityRequirement(name = "bearerAuth"))
+    public DocumentVersion visualSignDocument(
+            @PathVariable Long id,
+            @RequestBody com.smartedms.dto.VisualSignRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return documentSigningService.visualSignDocument(id, userId, request);
+    }
+
     @GetMapping("/pending-approvals")
     @Operation(summary = "Lấy danh sách tài liệu chờ duyệt", description = "Trả về các tài liệu đang ở trạng thái PENDING_APPROVAL do user hiện tại duyệt", security = @SecurityRequirement(name = "bearerAuth"))
     public List<Document> getPendingApprovals(@AuthenticationPrincipal UserDetails userDetails) {
