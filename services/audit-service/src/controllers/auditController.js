@@ -105,9 +105,48 @@ const getHealth = async (req, res) => {
   }
 };
 
+const sendNotification = async (req, res) => {
+  try {
+    const { userId, title, message, type, data } = req.body;
+    
+    const notificationPayload = {
+      title: title || 'Thông báo hệ thống',
+      message,
+      type: type || 'info',
+      data: data || {},
+      timestamp: new Date()
+    };
+
+    if (req.io) {
+      if (userId) {
+        // Gửi đích danh cho 1 user (có thể có nhiều tab/socket)
+        if (req.onlineUsers && req.onlineUsers.has(userId)) {
+          const userSockets = req.onlineUsers.get(userId);
+          userSockets.forEach(socketId => {
+            req.io.to(socketId).emit('NOTIFICATION', notificationPayload);
+          });
+          return res.status(200).json({ message: 'Notification sent to user', sent: true });
+        } else {
+          return res.status(200).json({ message: 'User is offline, notification queued/skipped', sent: false });
+        }
+      } else {
+        // Broadcast cho tất cả mọi người
+        req.io.emit('NOTIFICATION', notificationPayload);
+        return res.status(200).json({ message: 'Broadcast notification sent', sent: true });
+      }
+    }
+
+    res.status(500).json({ error: 'Socket server not initialized' });
+  } catch (error) {
+    console.error('Error sending notification:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
 module.exports = {
   createLog,
   getLogs,
   getDashboardOverview,
-  getHealth
+  getHealth,
+  sendNotification
 };

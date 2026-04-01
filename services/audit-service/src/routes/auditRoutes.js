@@ -11,5 +11,6 @@ router.get('/dashboard/health', auditController.getHealth);
 
 router.post('/logs', auditController.createLog);
 router.get('/logs', auditController.getLogs);
+router.post('/notifications', auditController.sendNotification);
 
 module.exports = router;

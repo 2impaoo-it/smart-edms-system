@@ -54,13 +54,12 @@ export function MainLayout() {
         const stored = localStorage.getItem('token');
         if (!stored || !currentUser) return;
 
-        // Fetch full user details to get real numeric ID if current id is a string (username)
+        // Fetch full user details to get real numeric ID
         import("../../services/userService").then(m => m.getOrgChart()).then(res => {
             if (Array.isArray(res.data)) {
                 const fullInfo = res.data.find((u: any) => u.username === currentUser.username || u.username === currentUser.id);
                 if (fullInfo) {
                     const updated = { ...currentUser, ...fullInfo };
-                    // Avoid redundant re-renders and localStorage writes if nothing changed
                     if (JSON.stringify(updated) !== JSON.stringify(currentUser)) {
                         localStorage.setItem('user', JSON.stringify(updated));
                         setCurrentUser(updated);
@@ -70,25 +69,30 @@ export function MainLayout() {
             }
         }).catch(console.error);
 
-        const socket = import("../../services/socketService").then(m => m.initSocket(currentUser.id));
-        
-        socket.then(s => {
-            if (!s) return;
-            
-            s.on("NOTIFICATION", (msg: string) => {
+        // Khởi tạo Socket
+        import("../../services/socketService").then(({ initSocket }) => {
+            const socket = initSocket(currentUser.id);
+            if (!socket) return;
+
+            // Lắng nghe thông báo chuẩn (Object)
+            socket.on("NOTIFICATION", (data: any) => {
+                const payload = typeof data === 'string' ? { message: data, title: 'Thông báo' } : data;
+                
                 const newNotif: AppNotification = {
                     id: Math.random().toString(36).substr(2, 9),
-                    title: 'Thông báo mới',
-                    message: msg,
-                    type: 'info',
+                    title: payload.title || 'Thông báo mới',
+                    message: payload.message,
+                    type: payload.type || 'info',
                     time: 'Vừa xong',
                     isRead: false
                 };
                 setNotifications(prev => [newNotif, ...prev]);
-                toast.info(msg);
+                
+                // Hiển thị Toast (socketService đã xử lý toast, nhưng ở đây ta có thể cập nhật thêm state UI)
             });
 
-            s.on("new_audit_log", (log: any) => {
+            // Lắng nghe audit log (Realtime Dashboard)
+            socket.on("new_audit_log", (log: any) => {
                 const newNotif: AppNotification = {
                     id: log._id || Math.random().toString(36).substr(2, 9),
                     title: 'Hành động hệ thống',
@@ -102,7 +106,7 @@ export function MainLayout() {
         });
 
         return () => {
-            import("../../services/socketService").then(m => m.disconnectSocket());
+            import("../../services/socketService").then(({ disconnectSocket }) => disconnectSocket());
         };
     }, [currentUser]);
 
