@@ -78,7 +78,8 @@ public class DocumentSigningService {
                             .build());
 
             // 3. Ký PDF
-            byte[] signedPdfBytes = pdfSignatureService.signPdf(pdfStream, keyStoreData.getPrivateKey(), keyStoreData.getCertificateChain(), reason, location);
+            byte[] pdfBytes = pdfStream.readAllBytes();
+            byte[] signedPdfBytes = pdfSignatureService.signPdf(pdfBytes, keyStoreData.getPrivateKey(), keyStoreData.getCertificateChain(), reason, location);
 
             // 4. Update MinIO V2
             String newObjectKey = buildObjectKey(document.getFolderId(), UUID.randomUUID() + "-signed-" + document.getName());
