@@ -34,7 +34,16 @@ export function SystemLogs() {
       const params: any = { limit: 100 };
       if (filterAction) params.action = filterAction;
       const res = await getAuditLogs(params);
-      setLogs(Array.isArray(res.data) ? res.data : []);
+      
+      let payload = res.data as any;
+      if (typeof payload === 'string') {
+        try {
+            payload = JSON.parse(payload);
+        } catch (e) {}
+      }
+      
+      const logArray = payload?.data ? payload.data : (Array.isArray(payload) ? payload : []);
+      setLogs(Array.isArray(logArray) ? logArray : []);
     } catch (err) {
       console.error(err);
       toast.error("Lỗi tải nhật ký", { description: "Không thể kết nối Audit Service" });

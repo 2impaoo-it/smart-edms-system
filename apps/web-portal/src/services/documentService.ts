@@ -79,6 +79,10 @@ export const rejectDocument = (id: string) => {
   return axiosClient.put(`/documents/${id}/reject`);
 };
 
+export const renameDocument = (id: string, name: string) => {
+  return axiosClient.put(`/documents/${id}/rename`, null, { params: { name } });
+};
+
 export const approveDocument = (id: string) => {
   return axiosClient.put(`/documents/${id}/approve`);
 };
