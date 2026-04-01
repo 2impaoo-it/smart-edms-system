@@ -38,7 +38,11 @@ export function UserManagement() {
       
       const mergedData = data.map((u: any) => {
           const ksInfo = keystores.find((k: any) => String(k.userId) === String(u.id) || String(k.id) === String(u.id));
-          return { ...u, hasKeystore: ksInfo ? ksInfo.hasKeystore : u.hasKeystore };
+          return { 
+              ...u, 
+              hasKeystore: ksInfo ? ksInfo.hasKeystore : u.hasKeystore,
+              isActive: u.isActive !== undefined ? u.isActive : (u.active !== undefined ? u.active : true)
+          };
       });
       setUsers(mergedData);
     } catch (err) {
@@ -259,8 +263,8 @@ export function UserManagement() {
 
               <div className="pt-4 border-t border-white/60 dark:border-white/10 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className={cn("w-2 h-2 rounded-full", user.isActive ? "bg-success animate-pulse" : "bg-slate-400")} />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{user.isActive ? "Online" : "Offline"}</span>
+                  <div className={cn("w-2 h-2 rounded-full", user.isActive ? "bg-success animate-pulse" : "bg-destructive")} />
+                  <span className={cn("text-[10px] font-black uppercase tracking-widest", user.isActive ? "text-success" : "text-destructive")}>{user.isActive ? "Hoạt động" : "Tạm khóa"}</span>
                 </div>
                 <div className="flex gap-2">
                   <button 

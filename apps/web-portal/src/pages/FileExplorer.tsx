@@ -30,6 +30,7 @@ import type { FileItem, User } from "../lib/types";
 import { cn } from "../lib/utils";
 import { getFolderContents, createFolder, deleteFolder, getPersonalTree, getDepartmentTree, shareFolder } from "../services/folderService";
 import { uploadDocument, getDocumentStreamUrl, getFolderDocuments, deleteDocument, getDocumentVersions, getDocumentVersionStreamUrl, uploadNewDocumentVersion, signDocument, submitForApproval, rejectDocument, approveDocument } from "../services/documentService";
+import { getOrgChart } from "../services/userService";
 
 interface FileExplorerProps {
     title: string;
@@ -119,6 +120,29 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
     const [shareFolderId, setShareFolderId] = useState<string | null>(null);
     const [shareUserId, setShareUserId] = useState("");
     const [shareRole, setShareRole] = useState<'VIEWER'|'EDITOR'>('VIEWER');
+
+    // System Users for Dropdown
+    const [orgUsers, setOrgUsers] = useState<any[]>([]);
+
+    useEffect(() => {
+        getOrgChart().then(res => {
+            if (Array.isArray(res.data)) {
+                setOrgUsers(res.data);
+            }
+        }).catch(err => console.error("Failed to load users", err));
+    }, []);
+
+    const getUserRole = (u: any) => {
+        let roles: string[] = [];
+        if (Array.isArray(u.roles)) roles = [...roles, ...u.roles.map((r: any) => typeof r === 'string' ? r : (r.name || r.authority || ''))];
+        if (Array.isArray(u.authorities)) roles = [...roles, ...u.authorities.map((r: any) => typeof r === 'string' ? r : (r.name || r.authority || ''))];
+        if (u.role) roles.push(u.role);
+        
+        roles = roles.map(r => String(r).toUpperCase());
+        if (roles.some(r => r.includes('ADMIN'))) return 'ADMIN';
+        if (roles.some(r => r.includes('MANAGER'))) return 'MANAGER';
+        return 'STAFF';
+    };
 
     // Fetch PDF Blob URL when viewing a file
     useEffect(() => {
@@ -895,15 +919,20 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                                 <form onSubmit={handleShareSubmit}>
                                     <div className="space-y-4 mb-8">
                                         <div>
-                                            <label className="text-xs font-bold text-slate-700 block mb-1">Mã Nhân Viên (User ID)</label>
-                                            <input 
-                                                type="text" 
-                                                placeholder="Ví dụ: 2" 
+                                            <label className="text-xs font-bold text-slate-700 block mb-1">Chọn Nhân viên (*)</label>
+                                            <select 
                                                 value={shareUserId}
                                                 onChange={e => setShareUserId(e.target.value)}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all" 
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer" 
                                                 required
-                                            />
+                                            >
+                                                <option value="" disabled>-- Chọn người dùng để chia sẻ --</option>
+                                                {orgUsers.filter(u => String(u.id) !== String(user?.id)).map(u => (
+                                                    <option key={u.id} value={u.id}>
+                                                        {u.fullName || u.username} - {u.jobTitle || getUserRole(u)}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </div>
                                         <div>
                                             <label className="text-xs font-bold text-slate-700 block mb-1">Mức Quyền</label>
@@ -954,16 +983,23 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                                 <form onSubmit={handleSubmitForApprovalForm}>
                                     <div className="space-y-4 mb-8">
                                         <div>
-                                            <label className="text-xs font-bold text-slate-700 block mb-1">ID Người Duyệt (Manager)</label>
-                                            <input 
-                                                type="text" 
-                                                placeholder="Ví dụ: 2" 
+                                            <label className="text-xs font-bold text-slate-700 block mb-1">Chọn Người Duyệt (Manager / Admin)</label>
+                                            <select 
                                                 value={approverId}
                                                 onChange={e => setApproverId(e.target.value)}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all" 
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer" 
                                                 required
-                                            />
-                                            <p className="text-xs text-muted-foreground mt-2 italic">* Tạm thời nhập ID (vd: 1, 2) theo Database do đồ án chưa cung cấp danh sách Manager.</p>
+                                            >
+                                                <option value="" disabled>-- Chọn Quản lý để Trình ký --</option>
+                                                {orgUsers
+                                                    .filter(u => String(u.id) !== String(user?.id) && (getUserRole(u) === 'MANAGER' || getUserRole(u) === 'ADMIN'))
+                                                    .map(u => (
+                                                        <option key={u.id} value={u.id}>
+                                                            {u.fullName || u.username} - {u.jobTitle || getUserRole(u)}
+                                                        </option>
+                                                    ))}
+                                            </select>
+                                            <p className="text-xs text-muted-foreground mt-2 italic">* Chỉ những tài khoản có vai trò Quản lý hoặc Admin mới có quyền phê duyệt.</p>
                                         </div>
                                     </div>
                                     <div className="flex gap-3">
