@@ -38,7 +38,11 @@ export function UserManagement() {
       
       const mergedData = data.map((u: any) => {
           const ksInfo = keystores.find((k: any) => String(k.userId) === String(u.id) || String(k.id) === String(u.id));
-          return { ...u, hasKeystore: ksInfo ? ksInfo.hasKeystore : u.hasKeystore };
+          return { 
+              ...u, 
+              hasKeystore: ksInfo ? ksInfo.hasKeystore : u.hasKeystore,
+              isActive: u.isActive !== undefined ? u.isActive : (u.active !== undefined ? u.active : true)
+          };
       });
       setUsers(mergedData);
     } catch (err) {
