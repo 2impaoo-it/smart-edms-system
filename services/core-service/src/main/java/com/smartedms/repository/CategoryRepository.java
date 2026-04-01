@@ -9,22 +9,22 @@ import java.util.Optional;
 
 public interface CategoryRepository extends JpaRepository<Category, Long> {
 
-    Optional<Category> findByIdAndIsDeletedFalse(Long id);
+    Optional<Category> findByIdAndDeletedFalse(Long id);
 
-    List<Category> findByParentIdAndIsDeletedFalse(Long parentId);
+    List<Category> findByParentIdAndDeletedFalse(Long parentId);
 
     List<Category> findByParentId(Long parentId);
 
-    List<Category> findByOwnerIdAndFolderTypeAndParentIdIsNullAndIsDeletedFalse(Long ownerId, FolderType folderType);
+    List<Category> findByOwnerIdAndFolderTypeAndParentIdIsNullAndDeletedFalse(Long ownerId, FolderType folderType);
 
-    List<Category> findByOwnerIdAndIsDeletedFalse(Long ownerId);
+    List<Category> findByOwnerIdAndDeletedFalse(Long ownerId);
 
-    List<Category> findByParentIdAndFolderTypeAndIsDeletedFalse(Long parentId, FolderType folderType);
+    List<Category> findByParentIdAndFolderTypeAndDeletedFalse(Long parentId, FolderType folderType);
 
-    List<Category> findByParentIdAndOwnerIdAndFolderTypeAndIsDeletedFalse(Long parentId, Long ownerId, FolderType folderType);
+    List<Category> findByParentIdAndOwnerIdAndFolderTypeAndDeletedFalse(Long parentId, Long ownerId, FolderType folderType);
 
-    List<Category> findByOwnerIdAndIsDeletedTrue(Long ownerId);
+    List<Category> findByOwnerIdAndDeletedTrue(Long ownerId);
 
-    List<Category> findByIsDeletedTrue();
+    List<Category> findByDeletedTrue();
 }
 

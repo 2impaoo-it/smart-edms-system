@@ -26,8 +26,8 @@ import java.util.Calendar;
 @Service
 public class PdfSignatureService {
 
-    public byte[] signPdf(InputStream pdfStream, PrivateKey privateKey, Certificate[] certChain, String reason, String location) throws Exception {
-        try (PDDocument document = PDDocument.load(pdfStream)) {
+    public byte[] signPdf(byte[] pdfBytes, PrivateKey privateKey, Certificate[] certChain, String reason, String location) throws Exception {
+        try (PDDocument document = PDDocument.load(pdfBytes)) {
             PDSignature signature = new PDSignature();
             signature.setFilter(PDSignature.FILTER_ADOBE_PPKLITE);
             signature.setSubFilter(PDSignature.SUBFILTER_ADBE_PKCS7_DETACHED);

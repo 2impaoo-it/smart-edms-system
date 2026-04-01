@@ -132,7 +132,7 @@ export function MainLayout() {
     const renderContent = () => {
         if (location.pathname === '/dashboard/files') {
             if (currentRole === 'ADMIN') return <PlaceholderPage title="Dashboard Admin" />;
-            return <FileExplorer title="Tài liệu cá nhân" currentFolderId={currentFolderId} onFolderChange={handleFolderChange} ownerId={currentUser.id} folderType="PERSONAL" />;
+            return <FileExplorer title="Tài liệu cá nhân" currentFolderId={currentFolderId} onFolderChange={handleFolderChange} ownerId={currentUser.id} user={currentUser} folderType="PERSONAL" />;
         }
         
         if (location.pathname === '/dashboard/department') {
