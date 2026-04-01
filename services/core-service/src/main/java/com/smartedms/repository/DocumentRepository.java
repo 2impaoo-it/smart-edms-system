@@ -13,11 +13,8 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
 
     List<Document> findByFolderIdAndDeletedFalse(Long folderId);
 
-<<<<<<< HEAD
-=======
     List<Document> findByFolderIdAndCreatedByAndDeletedFalse(Long folderId, Long createdBy);
 
->>>>>>> fab2979 (feat : soft delete)
     List<Document> findByFolderId(Long folderId);
 
     List<Document> findByApproverIdAndStatusAndDeletedFalse(Long approverId, com.smartedms.entity.DocumentStatus status);
