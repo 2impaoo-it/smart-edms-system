@@ -65,7 +65,7 @@ public class CategoryService {
         }
 
         // Document ở root level (không thuộc folder nào)
-        documentRepository.findByFolderIdAndIsDeletedFalse(null)
+        documentRepository.findByFolderIdAndCreatedByAndIsDeletedFalse(null, userId)
                 .forEach(doc -> tree.add(toDocumentNode(doc)));
 
         return tree;
@@ -221,9 +221,18 @@ public class CategoryService {
         Category category = folderRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Thư mục không tồn tại: " + id));
 
-        // Chỉ owner mới được xóa
+        // Kiểm tra quyền xóa (OWNER hoặc ADMIN hoặc người có quyền EDITOR đối với phòng ban)
         if (!userId.equals(category.getOwnerId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ người tạo thư mục mới có quyền xóa");
+            User currentUser = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
+            
+            boolean isAdmin = currentUser.getRoles().contains(Role.ROLE_ADMIN);
+            boolean isManagerWithEditor = currentUser.getRoles().contains(Role.ROLE_MANAGER) 
+                                        && permissionService.hasMinimumPermission(userId, id, PermissionLevel.EDITOR);
+
+            if (!isAdmin && !isManagerWithEditor) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền xóa thư mục của người khác");
+            }
         }
 
         softDeleteRecursive(category);
@@ -287,8 +296,13 @@ public class CategoryService {
         Category category = folderRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Thư mục không tồn tại: " + id));
 
+        // Kiểm tra quyền xóa vĩnh viễn
         if (!userId.equals(category.getOwnerId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ owner mới được xóa vĩnh viễn");
+            User currentUser = userRepository.findById(userId).orElse(null);
+            boolean isAdmin = currentUser != null && currentUser.getRoles().contains(Role.ROLE_ADMIN);
+            if (!isAdmin) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ Owner hoặc Admin mới được phép xóa vĩnh viễn");
+            }
         }
         if (!category.isDeleted()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vui lòng xóa mềm trước khi xóa vĩnh viễn");

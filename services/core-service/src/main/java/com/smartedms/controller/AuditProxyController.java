@@ -46,18 +46,23 @@ public class AuditProxyController {
         try {
             ResponseEntity<String> response = restTemplate.exchange(
                     builder.toUriString(), HttpMethod.GET, requestEntity, String.class);
-            return ResponseEntity.status(response.getStatusCode()).body(response.getBody());
+            return ResponseEntity.status(response.getStatusCode())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(response.getBody());
         } catch (HttpClientErrorException | HttpServerErrorException ex) {
             log.error("Audit service trả về lỗi HTTP {}: {}", ex.getStatusCode(), ex.getResponseBodyAsString());
             return ResponseEntity.status(ex.getStatusCode())
+                    .contentType(MediaType.APPLICATION_JSON)
                     .body("{\"error\": \"Audit service lỗi: " + ex.getStatusCode() + "\"}");
         } catch (ResourceAccessException ex) {
             log.error("Không thể kết nối tới Audit service tại cổng 3000: {}", ex.getMessage());
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .contentType(MediaType.APPLICATION_JSON)
                     .body("{\"error\": \"Không thể kết nối tới dịch vụ Audit. Vui lòng kiểm tra service đã chạy chưa.\"}");
         } catch (Exception ex) {
             log.error("Lỗi không xác định khi gọi Audit service: {}", ex.getMessage(), ex);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .contentType(MediaType.APPLICATION_JSON)
                     .body("{\"error\": \"Lỗi hệ thống khi truy vấn audit logs.\"}");
         }
     }
