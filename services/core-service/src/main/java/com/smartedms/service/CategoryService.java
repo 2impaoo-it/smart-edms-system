@@ -59,13 +59,13 @@ public class CategoryService {
         List<TreeDTO> tree = new ArrayList<>();
 
         List<Category> personalRoots = folderRepository
-                .findByOwnerIdAndFolderTypeAndParentIdIsNullAndIsDeletedFalse(userId, FolderType.PERSONAL);
+                .findByOwnerIdAndFolderTypeAndParentIdIsNullAndDeletedFalse(userId, FolderType.PERSONAL);
         for (Category root : personalRoots) {
             tree.add(buildTree(root, userId));
         }
 
         // Document ở root level (không thuộc folder nào)
-        documentRepository.findByFolderIdAndCreatedByAndIsDeletedFalse(null, userId)
+        documentRepository.findByFolderIdAndIsDeletedFalse(null)
                 .forEach(doc -> tree.add(toDocumentNode(doc)));
 
         return tree;
@@ -79,7 +79,7 @@ public class CategoryService {
 
         // 1. Thư mục phòng ban mà user là OWNER
         List<Category> ownedDeptRoots = folderRepository
-                .findByOwnerIdAndFolderTypeAndParentIdIsNullAndIsDeletedFalse(userId, FolderType.DEPARTMENT);
+                .findByOwnerIdAndFolderTypeAndParentIdIsNullAndDeletedFalse(userId, FolderType.DEPARTMENT);
         for (Category root : ownedDeptRoots) {
             tree.add(buildTree(root, userId));
         }
@@ -93,7 +93,7 @@ public class CategoryService {
         for (FolderPermission permission : sharedPermissions) {
             Long rootId = findDepartmentRootId(permission.getFolderId());
             if (rootId != null && !alreadyIncluded.contains(rootId)) {
-                Category rootFolder = folderRepository.findByIdAndIsDeletedFalse(rootId).orElse(null);
+                Category rootFolder = folderRepository.findByIdAndDeletedFalse(rootId).orElse(null);
                 if (rootFolder != null) {
                     tree.add(buildTree(rootFolder, userId));
                     alreadyIncluded.add(rootId);
@@ -110,18 +110,18 @@ public class CategoryService {
             FolderType type = parseFolderType(folderType);
             if (ownerId != null && type == FolderType.PERSONAL) {
                 // Tài liệu cá nhân: chỉ lấy folder do user sở hữu
-                return folderRepository.findByParentIdAndOwnerIdAndFolderTypeAndIsDeletedFalse(parentId, ownerId, type);
+                return folderRepository.findByParentIdAndOwnerIdAndFolderTypeAndDeletedFalse(parentId, ownerId, type);
             }
             if (ownerId != null && type == FolderType.DEPARTMENT) {
                 // Lọc thư mục phòng ban: user là owner HOẶC có quyền truy cập
-                List<Category> allDepts = folderRepository.findByParentIdAndFolderTypeAndIsDeletedFalse(parentId, type);
+                List<Category> allDepts = folderRepository.findByParentIdAndFolderTypeAndDeletedFalse(parentId, type);
                 return allDepts.stream()
                         .filter(cat -> objEquals(cat.getOwnerId(), ownerId) || permissionService.hasPermission(ownerId, cat.getId()))
                         .collect(Collectors.toList());
             }
-            return folderRepository.findByParentIdAndFolderTypeAndIsDeletedFalse(parentId, type);
+            return folderRepository.findByParentIdAndFolderTypeAndDeletedFalse(parentId, type);
         }
-        return folderRepository.findByParentIdAndIsDeletedFalse(parentId);
+        return folderRepository.findByParentIdAndDeletedFalse(parentId);
     }
 
     private boolean objEquals(Long a, Long b) {
@@ -132,6 +132,7 @@ public class CategoryService {
      * Tạo thư mục mới, gán ownerId = user hiện tại.
      * Nếu tạo thư mục con trong thư mục phòng ban, tự kế thừa folderType từ cha.
      */
+    @Transactional
     public Category create(CategoryRequestDTO dto, Long userId) {
         Category category = new Category();
         category.setName(dto.getName());
@@ -140,7 +141,7 @@ public class CategoryService {
 
         if (dto.getParentId() != null) {
             // Thư mục con: kế thừa folderType từ thư mục cha
-            Category parent = folderRepository.findByIdAndIsDeletedFalse(dto.getParentId())
+            Category parent = folderRepository.findByIdAndDeletedFalse(dto.getParentId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Thư mục cha không tồn tại"));
 
             // Kiểm tra quyền EDITOR trên thư mục cha trước khi tạo con
@@ -158,7 +159,7 @@ public class CategoryService {
                 User currentUser = userRepository.findById(userId)
                         .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
                 if (!currentUser.getRoles().contains(Role.ROLE_MANAGER) && !currentUser.getRoles().contains(Role.ROLE_ADMIN)) {
-                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ Manager hoặc Admin mới được tạo thư mục phòng ban");
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ Manager hoặc Admin mới được tạo thư mục phòng ban căn bản");
                 }
             }
 
@@ -167,7 +168,7 @@ public class CategoryService {
 
         category = folderRepository.save(category);
 
-        // Audit log – fault tolerant: không để lỗi Kafka/SecurityContext làm rollback thao tác chính
+        // Audit log – fault tolerant
         try {
             String username = org.springframework.security.core.context.SecurityContextHolder
                     .getContext().getAuthentication().getName();
@@ -185,12 +186,12 @@ public class CategoryService {
 
         return category;
     }
-
+    @Transactional
     public Category rename(Long id, CategoryRequestDTO dto, Long userId) {
-        Category category = folderRepository.findByIdAndIsDeletedFalse(id)
+        Category category = folderRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Thư mục không tồn tại: " + id));
 
-        if (!permissionService.hasMinimumPermission(userId, id, PermissionLevel.EDITOR)) {
+        if (!userId.equals(category.getOwnerId()) && !permissionService.hasMinimumPermission(userId, id, PermissionLevel.EDITOR)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền đổi tên thư mục này");
         }
 
@@ -218,7 +219,7 @@ public class CategoryService {
 
     @Transactional
     public void softDelete(Long id, Long userId) {
-        Category category = folderRepository.findByIdAndIsDeletedFalse(id)
+        Category category = folderRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Thư mục không tồn tại: " + id));
 
         // Kiểm tra quyền xóa (OWNER hoặc ADMIN hoặc người có quyền EDITOR đối với phòng ban)
@@ -255,7 +256,7 @@ public class CategoryService {
     }
 
     public List<Category> getDeletedCategories(Long userId) {
-        return folderRepository.findByOwnerIdAndIsDeletedTrue(userId);
+        return folderRepository.findByOwnerIdAndDeletedTrue(userId);
     }
 
     @Transactional
@@ -358,7 +359,7 @@ public class CategoryService {
      * Tìm folder gốc (parentId = null) của một folder phòng ban bất kỳ.
      */
     private Long findDepartmentRootId(Long folderId) {
-        Category folder = folderRepository.findByIdAndIsDeletedFalse(folderId).orElse(null);
+        Category folder = folderRepository.findByIdAndDeletedFalse(folderId).orElse(null);
         if (folder == null) {
             return null;
         }
@@ -372,13 +373,13 @@ public class CategoryService {
         category.setDeleted(true);
         folderRepository.save(category);
 
-        documentRepository.findByFolderIdAndIsDeletedFalse(category.getId())
+        documentRepository.findByFolderIdAndDeletedFalse(category.getId())
                 .forEach(doc -> {
                     doc.setDeleted(true);
                     documentRepository.save(doc);
                 });
 
-        folderRepository.findByParentIdAndIsDeletedFalse(category.getId())
+        folderRepository.findByParentIdAndDeletedFalse(category.getId())
                 .forEach(this::softDeleteRecursive);
     }
 
@@ -394,10 +395,10 @@ public class CategoryService {
         PermissionLevel effectivePermission = permissionService.getEffectivePermission(userId, folder.getId());
         dto.setPermissionLevel(effectivePermission != null ? effectivePermission.name() : null);
 
-        folderRepository.findByParentIdAndIsDeletedFalse(folder.getId())
+        folderRepository.findByParentIdAndDeletedFalse(folder.getId())
                 .forEach(child -> dto.getChildren().add(buildTree(child, userId)));
 
-        documentRepository.findByFolderIdAndIsDeletedFalse(folder.getId())
+        documentRepository.findByFolderIdAndDeletedFalse(folder.getId())
                 .forEach(doc -> dto.getChildren().add(toDocumentNode(doc)));
 
         return dto;

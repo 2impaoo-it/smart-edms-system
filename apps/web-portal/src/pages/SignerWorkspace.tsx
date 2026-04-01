@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "../lib/utils";
+import { approveDocument } from "../services/documentService";
+import { gooeyToast as toast } from "goey-toast";
 
 interface SignaturePos {
     x: number;
@@ -68,13 +70,18 @@ export function SignerWorkspace({ fileId, onClose, onSignSuccess }: { fileId: st
         ctx?.stroke();
     };
 
-    const handleCompleteSign = () => {
+    const handleCompleteSign = async () => {
         setIsSaving(true);
-        setTimeout(() => {
-            setIsSaving(false);
+        try {
+            await approveDocument(fileId);
+            toast.success("Đã phê duyệt tài liệu thành công");
             onSignSuccess?.(fileId);
             onClose();
-        }, 2000);
+        } catch (error: any) {
+            toast.error("Phê duyệt thất bại", { description: error?.response?.data?.message || "Lỗi hệ thống" });
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     return (

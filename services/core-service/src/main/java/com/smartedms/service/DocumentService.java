@@ -68,12 +68,8 @@ public class DocumentService {
         this.auditLogPublisherService = auditLogPublisherService;
     }
 
-    public List<Document> getByFolderId(Long folderId, Long userId) {
-        if (folderId == null) {
-            return documentRepository.findByFolderIdAndCreatedByAndIsDeletedFalse(null, userId);
-        }
+    public List<Document> getByFolderId(Long folderId) {
         return documentRepository.findByFolderIdAndIsDeletedFalse(folderId);
-    }
 
     public void softDelete(Long id) {
         Document document = documentRepository.findById(id)
@@ -146,12 +142,12 @@ public class DocumentService {
     }
 
     public List<Document> getDeletedDocuments() {
-        return documentRepository.findByIsDeletedTrue();
+        return documentRepository.findByDeletedTrue();
     }
 
     @Transactional
     public void emptyAllTrash() {
-        List<Document> deletedDocs = documentRepository.findByIsDeletedTrue();
+        List<Document> deletedDocs = documentRepository.findByDeletedTrue();
         for (Document doc : deletedDocs) {
             hardDeleteDocument(doc.getId());
         }
@@ -295,16 +291,22 @@ public class DocumentService {
     }
 
     public List<Document> getPendingApprovals(Long approverId) {
-        return documentRepository.findByApproverIdAndStatusAndIsDeletedFalse(approverId, com.smartedms.entity.DocumentStatus.PENDING_APPROVAL);
+        return documentRepository.findByApproverIdAndStatusAndDeletedFalse(approverId, com.smartedms.entity.DocumentStatus.PENDING_APPROVAL);
     }
 
     @Transactional
     public Document uploadPdf(MultipartFile file, Long folderId, Long userId) {
         validateSupportedFormat(file);
+        
+        // CHỈNH SỬA: Cấm upload lên root theo yêu cầu của user
+        if (folderId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vui lòng chọn thư mục. Không được phép upload tài liệu lên thư mục gốc.");
+        }
+        
         validateFolder(folderId);
 
         // Kiểm tra quyền EDITOR trên thư mục đích
-        if (folderId != null && !permissionService.hasMinimumPermission(userId, folderId, PermissionLevel.EDITOR)) {
+        if (!permissionService.hasMinimumPermission(userId, folderId, PermissionLevel.EDITOR)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền upload vào thư mục này");
         }
 
@@ -323,6 +325,10 @@ public class DocumentService {
             String storedFileName = buildStoredFileName(safePdfName);
             String objectKey = buildObjectKey(folderId, storedFileName);
 
+            // Kiểm tra và đảm bảo bucket tồn tại
+            if (defaultBucket == null || defaultBucket.isBlank()) {
+                throw new IllegalStateException("MinIO bucket name is not configured in application.properties");
+            }
             ensureBucketExists(defaultBucket);
 
             minioClient.putObject(

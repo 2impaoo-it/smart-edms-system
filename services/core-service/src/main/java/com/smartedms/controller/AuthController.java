@@ -110,4 +110,31 @@ public class AuthController {
 
                 return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
         }
+
+        @Operation(summary = "Đổi mật khẩu", description = "User tự đổi mật khẩu trong phần cài đặt")
+        @SecurityRequirement(name = "bearerAuth")
+        @PutMapping("/change-password")
+        public ResponseEntity<Map<String, String>> changePassword(
+                        @RequestBody Map<String, String> request) {
+                String username = SecurityContextHolder.getContext().getAuthentication().getName();
+                User user = userRepository.findByUsername(username)
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+                String currentPassword = request.get("currentPassword");
+                String newPassword = request.get("newPassword");
+
+                if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mật khẩu hiện tại không chính xác");
+                }
+
+                if (newPassword == null || newPassword.trim().length() < 6) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Mật khẩu mới phải có ít nhất 6 ký tự");
+                }
+
+                user.setPassword(passwordEncoder.encode(newPassword));
+                userRepository.save(user);
+
+                return ResponseEntity.ok(Map.of("message", "Đổi mật khẩu thành công"));
+        }
 }

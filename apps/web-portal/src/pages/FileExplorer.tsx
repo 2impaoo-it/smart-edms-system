@@ -206,7 +206,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                 owner: ownerId || user?.id || 'sys', // default owner
                 status: 'draft',
                 parentId: cat.parentId ? String(cat.parentId) : null,
-                isDeleted: cat.isDeleted
+                isDeleted: cat.deleted
             }));
 
             // Map Backend Document to Frontend FileItem
@@ -219,7 +219,7 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                 owner: ownerId || user?.id || 'sys',
                 status: doc.status || 'DRAFT',
                 parentId: doc.folderId ? String(doc.folderId) : null,
-                isDeleted: doc.isDeleted
+                isDeleted: doc.deleted
             }));
 
             setFiles([...mappedFolders, ...mappedDocuments]);
@@ -349,13 +349,22 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
 
     const handleUpload = async (e?: React.ChangeEvent<HTMLInputElement>) => {
         if (!e || !e.target.files || e.target.files.length === 0) return;
-        
+
         const file = e.target.files[0];
+
+        // KIỂM TRA ROOT: Cấm upload lên root theo yêu cầu
+        const isRoot = !currentFolderId || currentFolderId === 'root' || currentFolderId === 'dept_root';
+        if (isRoot) {
+            toast.error("Không được phép upload lên thư mục gốc", { 
+                description: "Vui lòng chọn một thư mục hoặc tạo thư mục mới trước khi tải lên tài liệu PDF." 
+            });
+            return;
+        }
+
         setIsUploadModalOpen(false);
 
         try {
-            const apiParentId = (currentFolderId === 'root' || currentFolderId === 'dept_root') ? null : currentFolderId;
-            
+            const apiParentId = currentFolderId;            
             const uploadTask = uploadDocument(file, apiParentId);
             
             toast.promise(
