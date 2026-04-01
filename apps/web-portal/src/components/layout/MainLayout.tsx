@@ -14,13 +14,17 @@ import { SignatureManagement } from "../../pages/SignatureManagement";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { gooeyToast as toast } from "goey-toast";
 
-export interface AppNotification {
+import { initSocket, disconnectSocket } from "../../services/socketService";
+
+interface AppNotification {
     id: string;
     title: string;
     message: string;
     type: 'info' | 'warning' | 'error' | 'success';
     time: string;
     isRead: boolean;
+    category?: 'DOCUMENT' | 'FEED' | 'SYSTEM' | 'AUTH';
+    targetId?: string;
 }
 
 export function MainLayout() {
@@ -28,7 +32,6 @@ export function MainLayout() {
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // Lấy thông tin user từ localStorage, đã được kiểm tra ở ProtectedRoute
     const [currentUser, setCurrentUser] = useState<any>(() => {
         const stored = localStorage.getItem('user');
         return stored ? JSON.parse(stored) : null; 
@@ -44,17 +47,35 @@ export function MainLayout() {
     }, []);
 
     const currentRole: UserRole = currentUser?.role || 'STAFF';
-    
     const currentFolderId = searchParams.get('folder');
 
-    // --- REAL-TIME NOTIFICATIONS SYSTEM ---
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
+
+    const addNotification = (notif: Partial<AppNotification>) => {
+        const newNotif: AppNotification = {
+            id: Math.random().toString(36).substr(2, 9),
+            title: notif.title || 'Thông báo',
+            message: notif.message || '',
+            type: notif.type || 'info',
+            time: 'Vừa xong',
+            isRead: false,
+            category: notif.category,
+            targetId: notif.targetId
+        };
+        setNotifications(prev => [newNotif, ...prev]);
+        
+        // Show toast based on type
+        if (newNotif.type === 'success') toast.success(newNotif.title, { description: newNotif.message });
+        else if (newNotif.type === 'error') toast.error(newNotif.title, { description: newNotif.message });
+        else if (newNotif.type === 'warning') toast.warning(newNotif.title, { description: newNotif.message });
+        else toast.info(newNotif.title, { description: newNotif.message });
+    };
 
     useEffect(() => {
         const stored = localStorage.getItem('token');
         if (!stored || !currentUser) return;
 
-        // Fetch full user details to get real numeric ID
+        // Sync user info
         import("../../services/userService").then(m => m.getOrgChart()).then(res => {
             if (Array.isArray(res.data)) {
                 const fullInfo = res.data.find((u: any) => u.username === currentUser.username || u.username === currentUser.id);
@@ -69,46 +90,110 @@ export function MainLayout() {
             }
         }).catch(console.error);
 
-        // Khởi tạo Socket
-        import("../../services/socketService").then(({ initSocket }) => {
-            const socket = initSocket(currentUser.id);
-            if (!socket) return;
+        const s = initSocket(currentUser.id);
+        
+        // Define listeners with references so we can remove them specifically without breaking other components
+        const handleSysNotification = (msg: string) => {
+            addNotification({ title: 'Hệ thống', message: msg, type: 'info' });
+        };
+        const handleNewPost = (data: any) => {
+            if (data.authorId !== currentUser.id && data.authorId !== Number(currentUser.id)) {
+                addNotification({ 
+                    title: 'Bảng tin mới', 
+                    message: `${data.authorName || 'Một người'} vừa đăng bài viết mới.`,
+                    type: 'info',
+                    category: 'FEED',
+                    targetId: data._id || data.id
+                });
+            }
+        };
+        const handleNewComment = ({ postId, comment }: any) => {
+            if (comment.userId !== currentUser.id && comment.userId !== Number(currentUser.id)) {
+                addNotification({ 
+                    title: 'Bình luận mới', 
+                    message: `${comment.userName || 'Ai đó'} vừa bình luận.`,
+                    type: 'info',
+                    category: 'FEED',
+                    targetId: postId
+                });
+            }
+        };
+        const handleAuditLog = (log: any) => {
+            if (currentRole === 'ADMIN') {
+                addNotification({ 
+                    id: log._id,
+                    title: 'Nhật ký hệ thống',
+                    message: `[${log.category}] ${log.actorName || 'Hệ thống'} thực hiện: ${log.action}`,
+                    type: 'info',
+                    category: 'SYSTEM'
+                });
+            }
+        };
 
-            // Lắng nghe thông báo chuẩn (Object)
-            socket.on("NOTIFICATION", (data: any) => {
-                const payload = typeof data === 'string' ? { message: data, title: 'Thông báo' } : data;
-                
-                const newNotif: AppNotification = {
-                    id: Math.random().toString(36).substr(2, 9),
-                    title: payload.title || 'Thông báo mới',
-                    message: payload.message,
-                    type: payload.type || 'info',
-                    time: 'Vừa xong',
-                    isRead: false
-                };
-                setNotifications(prev => [newNotif, ...prev]);
-                
-                // Hiển thị Toast (socketService đã xử lý toast, nhưng ở đây ta có thể cập nhật thêm state UI)
+        // Fallback for mocked Spring Boot events until backend is fully integrated
+        const handleDocApproved = (data: any) => {
+            addNotification({ 
+                title: 'Tài liệu đã được duyệt', 
+                message: `Tài liệu "${data.name}" của bạn đã được phê duyệt bởi ${data.approverName}`,
+                type: 'success',category: 'DOCUMENT',targetId: data.id
             });
+        };
+        const handleDocSigned = (data: any) => {
+            addNotification({ 
+                title: 'Tài liệu đã ký số', 
+                message: `Tài liệu "${data.name}" đã hoàn tất việc ký số.`,
+                type: 'success', category: 'DOCUMENT', targetId: data.id
+            });
+        };
+        const handlePendingApproval = (data: any) => {
+            addNotification({ 
+                title: 'Yêu cầu phê duyệt mới', 
+                message: `Nhân viên ${data.staffName} vừa trình ký tài liệu: ${data.documentName}`,
+                type: 'warning', category: 'DOCUMENT', targetId: data.id
+            });
+        };
 
-            // Lắng nghe audit log (Realtime Dashboard)
-            socket.on("new_audit_log", (log: any) => {
-                const newNotif: AppNotification = {
-                    id: log._id || Math.random().toString(36).substr(2, 9),
-                    title: 'Hành động hệ thống',
-                    message: `${log.actorName || 'Ai đó'} vừa thực hiện ${log.action}`,
-                    type: 'success',
-                    time: 'Vừa xong',
-                    isRead: false
-                };
-                setNotifications(prev => [newNotif, ...prev]);
-            });
-        });
+        if (s) {
+            // --- COMMON EVENTS ---
+            s.on("NOTIFICATION", handleSysNotification);
+            s.on("NEW_POST", handleNewPost);
+            s.on("NEW_COMMENT", handleNewComment);
+            s.on("new_audit_log", handleAuditLog);
+
+            // --- ROLE-BASED EVENTS (Chờ ghép Spring Boot Realtime sau) ---
+            if (currentRole === 'STAFF') {
+                s.on("DOCUMENT_APPROVED", handleDocApproved);
+                s.on("DOCUMENT_SIGNED", handleDocSigned);
+            }
+
+            if (currentRole === 'MANAGER') {
+                s.on("PENDING_APPROVAL_REQUEST", handlePendingApproval);
+            }
+        }
 
         return () => {
-            import("../../services/socketService").then(({ disconnectSocket }) => disconnectSocket());
+            if (s) {
+                s.off("NOTIFICATION", handleSysNotification);
+                s.off("NEW_POST", handleNewPost);
+                s.off("NEW_COMMENT", handleNewComment);
+                s.off("new_audit_log", handleAuditLog);
+                s.off("DOCUMENT_APPROVED", handleDocApproved);
+                s.off("DOCUMENT_SIGNED", handleDocSigned);
+                s.off("PENDING_APPROVAL_REQUEST", handlePendingApproval);
+            }
         };
-    }, [currentUser]);
+    }, [currentUser, currentRole]);
+
+    const handleMarkAllRead = () => {
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    };
+
+    const handleNotificationClick = (notif: AppNotification) => {
+        setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
+        if (notif.category === 'DOCUMENT') navigate('/dashboard/approvals');
+        if (notif.category === 'FEED') navigate('/dashboard');
+        if (notif.category === 'SYSTEM') navigate('/dashboard/audit-logs');
+    };
 
     // --- SECURITY: ADMIN CANNOT ACCESS PERSONAL/DEPARTMENT FILES ---
     useEffect(() => {
@@ -164,7 +249,13 @@ export function MainLayout() {
         <div className="flex h-screen overflow-hidden selection:bg-primary/20 selection:text-primary transition-colors duration-300 bg-slate-50 dark:bg-slate-950 relative">
             
             {/* Sidebar is now always visible */}
-            <Sidebar role={currentRole} user={currentUser} notifications={notifications} />
+            <Sidebar 
+                role={currentRole} 
+                user={currentUser} 
+                notifications={notifications} 
+                onMarkAllRead={handleMarkAllRead}
+                onNotificationClick={handleNotificationClick}
+            />
 
             {/* Main Content */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
