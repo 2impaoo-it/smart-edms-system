@@ -74,7 +74,7 @@ services:
     # Lưu ý cực kỳ quan trọng: Trong Docker Compose, bạn KHÔNG ĐƯỢC để "http 80"
     # Vì ngrok sẽ lấy cổng 80 của chính cái container ngrok!
     # Phải gọi "http nginx:80" để ngrok trỏ luồng sang cái container Nginx kế bên.
-    command: "http nginx:80 --url=pseudoeconomical-loise-interpolable.ngrok-free.dev"
+    command: "http nginx:80 --url=vincent-electrosynthetic-lisa.ngrok-free.dev"
     depends_on:
       - nginx
     networks:

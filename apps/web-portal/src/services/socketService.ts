@@ -5,7 +5,7 @@ import { io, Socket } from "socket.io-client";
  */
 
 let socket: Socket | null = null;
-const BACKEND_URL = "https://pseudoeconomical-loise-interpolable.ngrok-free.dev";
+const BACKEND_URL = "https://vincent-electrosynthetic-lisa.ngrok-free.dev";
 
 export const initSocket = (userId: number | string) => {
   if (socket) return socket;
