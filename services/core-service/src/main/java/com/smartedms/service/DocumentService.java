@@ -71,13 +71,17 @@ public class DocumentService {
     public List<Document> getByFolderId(Long folderId) {
         return documentRepository.findByFolderIdAndIsDeletedFalse(folderId);
 
-    public void softDelete(Long id) {
+    @Transactional
+    public void softDelete(Long id, Long userId) {
         Document document = documentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+        
+        checkDeletePermission(document, userId);
+
         document.setDeleted(true);
         documentRepository.save(document);
 
-        // Audit log – fault tolerant: không để lỗi Kafka/SecurityContext rollback thao tác xóa
+        // Audit log – fault tolerant: không để lỗi SecurityContext rollback thao tác xóa
         try {
             String username = org.springframework.security.core.context.SecurityContextHolder
                     .getContext().getAuthentication().getName();
@@ -94,9 +98,12 @@ public class DocumentService {
     }
 
     @Transactional
-    public Document restoreDocument(Long id) {
+    public Document restoreDocument(Long id, Long userId) {
         Document document = documentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+        
+        checkDeletePermission(document, userId);
+
         if (!document.isDeleted()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tài liệu này không nằm trong thùng rác");
         }
@@ -121,9 +128,11 @@ public class DocumentService {
     }
 
     @Transactional
-    public void hardDeleteDocument(Long id) {
+    public void hardDeleteDocument(Long id, Long userId) {
         Document document = documentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+        
+        checkDeletePermission(document, userId);
         
         List<DocumentVersion> versions = documentVersionRepository.findByDocumentIdOrderByVersionNumberDesc(id);
         for (DocumentVersion version : versions) {
@@ -147,9 +156,9 @@ public class DocumentService {
 
     @Transactional
     public void emptyAllTrash() {
-        List<Document> deletedDocs = documentRepository.findByDeletedTrue();
+        List<Document> deletedDocs = documentRepository.findByIsDeletedTrue();
         for (Document doc : deletedDocs) {
-            hardDeleteDocument(doc.getId());
+            hardDeleteDocument(doc.getId(), userId);
         }
 
         // Audit log – fault tolerant
@@ -543,6 +552,25 @@ public class DocumentService {
         } catch (Exception exception) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "Failed to stream document", exception);
+        }
+    }
+
+    private void checkDeletePermission(Document document, Long userId) {
+        if (document.getFolderId() != null) {
+            if (!permissionService.hasMinimumPermission(userId, document.getFolderId(), PermissionLevel.EDITOR)) {
+                if (!userId.equals(document.getCreatedBy())) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền thao tác trên tài liệu này");
+                }
+            }
+        } else {
+            if (!userId.equals(document.getCreatedBy())) {
+                boolean isAdmin = org.springframework.security.core.context.SecurityContextHolder
+                        .getContext().getAuthentication().getAuthorities()
+                        .stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+                if (!isAdmin) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền thao tác trên tài liệu của người khác");
+                }
+            }
         }
     }
 

@@ -1225,12 +1225,12 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                                             </button>
                                         )}
                                         {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && fileToView.status === 'PENDING_APPROVAL' && (
-                                            <button onClick={(e) => handleApproveWithoutSign(e, fileToView.id)} className="p-3 bg-success text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                                            <button onClick={(e) => handleApproveWithoutSign(e, fileToView.id.replace('doc_', '').replace('folder_', ''))} className="p-3 bg-success text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
                                                 <CheckCircle className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Duyệt nhanh</span>
                                             </button>
                                         )}
                                         {fileToView.status === 'PENDING_APPROVAL' && (user?.role === 'MANAGER' || user?.role === 'ADMIN') && (
-                                            <button onClick={(e) => handleReject(e, fileToView.id)} className="p-3 bg-destructive text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                                            <button onClick={(e) => handleReject(e, fileToView.id.replace('doc_', '').replace('folder_', ''))} className="p-3 bg-destructive text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
                                                 <X className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Từ chối</span>
                                             </button>
                                         )}
