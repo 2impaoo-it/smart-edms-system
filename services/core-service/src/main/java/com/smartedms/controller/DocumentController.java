@@ -43,8 +43,11 @@ public class DocumentController {
 
     @GetMapping
     @Operation(summary = "Lấy danh sách các file trong folder", security = @SecurityRequirement(name = "bearerAuth"))
-    public List<Document> getByFolderId(@RequestParam(required = false) Long folderId) {
-        return documentService.getByFolderId(folderId);
+    public List<Document> getByFolderId(
+            @RequestParam(required = false) Long folderId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return documentService.getByFolderId(folderId, userId);
     }
 
     @PostMapping(consumes = "multipart/form-data")
@@ -154,6 +157,16 @@ public class DocumentController {
             @AuthenticationPrincipal UserDetails userDetails) {
         Long userId = resolveUserId(userDetails);
         return documentService.submitForApproval(id, approverId, userId);
+    }
+
+    @PutMapping("/{id}/rename")
+    @Operation(summary = "Đổi tên tài liệu", security = @SecurityRequirement(name = "bearerAuth"))
+    public Document renameDocument(
+            @PathVariable Long id,
+            @RequestParam String name,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = resolveUserId(userDetails);
+        return documentService.renameDocument(id, name, userId);
     }
 
     @PutMapping("/{id}/reject")

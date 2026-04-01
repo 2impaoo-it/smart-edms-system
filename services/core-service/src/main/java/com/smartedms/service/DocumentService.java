@@ -68,7 +68,10 @@ public class DocumentService {
         this.auditLogPublisherService = auditLogPublisherService;
     }
 
-    public List<Document> getByFolderId(Long folderId) {
+    public List<Document> getByFolderId(Long folderId, Long userId) {
+        if (folderId == null) {
+            return documentRepository.findByFolderIdAndCreatedByAndIsDeletedFalse(null, userId);
+        }
         return documentRepository.findByFolderIdAndIsDeletedFalse(folderId);
     }
 
@@ -197,12 +200,47 @@ public class DocumentService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ tài liệu DRAFT mới có thể trình ký");
         }
 
+        // Bỏ qua check quyền nếu ở thư mục cá nhân root
         if (document.getFolderId() != null && !permissionService.hasMinimumPermission(userId, document.getFolderId(), PermissionLevel.EDITOR)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền trình ký tài liệu này");
         }
 
+        // Kiểm tra approver: User quản lý được chọn có tồn tại không
+        if (approverId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vui lòng chọn Quản lý để phê duyệt");
+        }
+
         document.setStatus(com.smartedms.entity.DocumentStatus.PENDING_APPROVAL);
         document.setApproverId(approverId);
+        return documentRepository.save(document);
+    }
+
+    @Transactional
+    public Document renameDocument(Long documentId, String newName, Long userId) {
+        Document document = documentRepository.findById(documentId)
+                .filter(existing -> !existing.isDeleted())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+
+        if (document.getFolderId() != null && !permissionService.hasMinimumPermission(userId, document.getFolderId(), PermissionLevel.EDITOR)) {
+            // Nếu không có quyền EDITOR ở thư mục phòng ban
+            if (!userId.equals(document.getCreatedBy())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền đổi tên tài liệu này");
+            }
+        } else if (document.getFolderId() == null) {
+            // Document root
+            if (!userId.equals(document.getCreatedBy())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền đổi tên tài liệu của người khác");
+            }
+        }
+
+        // Xử lý đuôi if missing extension
+        String safeName = getSafePdfName(newName);
+        if (!newName.toLowerCase().endsWith(".pdf") && !newName.toLowerCase().matches(".*\\.(docx|doc|xlsx|xls|pptx|ppt)$")) {
+             document.setName(safeName);
+        } else {
+             document.setName(newName);
+        }
+
         return documentRepository.save(document);
     }
 
