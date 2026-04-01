@@ -13,6 +13,10 @@ export const uploadDocument = (file: File, folderId: string | null) => {
   });
 };
 
+export const getDocumentById = (id: string) => {
+  return axiosClient.get(`/documents/${id}`);
+};
+
 export const getDocumentStreamUrl = (id: string) => {
   // We can just construct the URL and let the browser fetch it, but we need Auth token.
   // Since we need to pass Auth header, we should fetch it as a blob.
@@ -85,6 +89,10 @@ export const renameDocument = (id: string, name: string) => {
 
 export const approveDocument = (id: string) => {
   return axiosClient.put(`/documents/${id}/approve`);
+};
+
+export const visualSignDocument = (id: string, payload: { signatureBase64: string, x: number, y: number, width: number, height: number, pageNumber: number }) => {
+  return axiosClient.post(`/documents/${id}/visual-sign`, payload);
 };
 
 export const getPendingApprovals = () => {

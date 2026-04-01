@@ -1,11 +1,8 @@
 package com.smartedms.config;
 
-import com.smartedms.entity.User;
-import com.smartedms.repository.UserRepository;
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -13,10 +10,7 @@ import java.util.Optional;
 @Component
 public class SecurityAuditorAware implements AuditorAware<Long> {
 
-    private final UserRepository userRepository;
-
-    public SecurityAuditorAware(UserRepository userRepository) {
-        this.userRepository = userRepository;
+    public SecurityAuditorAware() {
     }
 
     @Override
@@ -28,14 +22,10 @@ public class SecurityAuditorAware implements AuditorAware<Long> {
         }
 
         Object principal = authentication.getPrincipal();
-        String username;
-        if (principal instanceof UserDetails) {
-            username = ((UserDetails) principal).getUsername();
-        } else {
-            username = principal.toString();
+        if (principal instanceof com.smartedms.security.CustomUserDetails) {
+            return Optional.of(((com.smartedms.security.CustomUserDetails) principal).getId());
         }
 
-        Optional<User> userOptional = userRepository.findByUsername(username);
-        return userOptional.map(User::getId);
+        return Optional.empty();
     }
 }

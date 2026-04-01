@@ -22,9 +22,9 @@ public class AuditLogPublisherService {
     @Value("${audit.secret-key}")
     private String auditSecretKey;
 
-    public AuditLogPublisherService(ObjectMapper objectMapper) {
+    public AuditLogPublisherService() {
         this.restTemplate = new RestTemplate();
-        this.objectMapper = objectMapper;
+        this.objectMapper = new ObjectMapper();
     }
 
     /**

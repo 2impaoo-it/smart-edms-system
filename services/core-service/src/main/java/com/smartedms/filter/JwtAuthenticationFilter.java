@@ -10,8 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -76,12 +74,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     .map(SimpleGrantedAuthority::new)
                     .collect(Collectors.toList());
 
-            // Sử dụng password placeholder an toàn vì authentication dựa trên token đã
-            // validated
-            UserDetails userDetails = User.withUsername(username)
-                    .password("{noop}") // Password không được sử dụng cho authentication từ token
-                    .authorities(authorities)
-                    .build();
+            com.smartedms.security.CustomUserDetails userDetails = new com.smartedms.security.CustomUserDetails(
+                    currentUser.getId(),
+                    username,
+                    "{noop}", 
+                    authorities
+            );
 
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                     userDetails,
