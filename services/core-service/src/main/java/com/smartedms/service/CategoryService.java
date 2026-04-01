@@ -237,7 +237,7 @@ public class CategoryService {
 
         softDeleteRecursive(category);
 
-        // Audit log – fault tolerant: không để lỗi Kafka/SecurityContext rollback thao tác xóa
+        // Audit log – fault tolerant: không để lỗi SecurityContext rollback thao tác xóa
         try {
             String username = org.springframework.security.core.context.SecurityContextHolder
                     .getContext().getAuthentication().getName();

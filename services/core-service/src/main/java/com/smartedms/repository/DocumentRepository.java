@@ -30,5 +30,7 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
 
     List<Document> findByIsDeletedTrue();
 
+    List<Document> findByCreatedByAndDeletedTrue(Long createdBy);
+
     long countByStatus(com.smartedms.entity.DocumentStatus status);
 }
