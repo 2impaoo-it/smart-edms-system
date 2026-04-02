@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const axiosClient = axios.create({
-  baseURL: "https://pseudoeconomical-loise-interpolable.ngrok-free.dev/api",
+  baseURL: "https://vincent-electrosynthetic-lisa.ngrok-free.dev/api",
   headers: {
     "Content-Type": "application/json",
     "ngrok-skip-browser-warning": "true",
