@@ -10,6 +10,7 @@ target/
 .settings/
 *.iml
 .idea/
+application.properties
 
 # Node / React
 node_modules/
@@ -23,6 +24,11 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Lock files - không cần commit trong monorepo
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
 # Docker
 *.env
@@ -41,3 +47,9 @@ Thumbs.db
 # Misc
 tmp/
 temp/
+walkthrough.md
+
+# File test và báo cáo tạm thời
+test_api.js
+backend_comprehensive_report.md
+implementation_plan.md

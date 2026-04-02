@@ -1,0 +1,90 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: emds-microservices-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-smartedms}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartedms123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - smartedms-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: emds-microservices-minio
+    restart: always
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - smartedms-network
+
+  mongodb:
+    image: mongo:latest
+    container_name: emds-microservices-mongodb
+    restart: always
+    environment:
+      MONGO_INITDB_DATABASE: smartedms-audit
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - smartedms-network
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: emds-microservices-gotenberg
+    restart: always
+    ports:
+      - "3001:3000"
+    networks:
+      - smartedms-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: emds-api-gateway
+    restart: always
+    ports:
+      - "80:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - smartedms-network
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: emds-api-ngrok
+    restart: always
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    # Lưu ý cực kỳ quan trọng: Trong Docker Compose, bạn KHÔNG ĐƯỢC để "http 80"
+    # Vì ngrok sẽ lấy cổng 80 của chính cái container ngrok!
+    # Phải gọi "http nginx:80" để ngrok trỏ luồng sang cái container Nginx kế bên.
+    command: "http nginx:80 --url=vincent-electrosynthetic-lisa.ngrok-free.dev"
+    depends_on:
+      - nginx
+    networks:
+      - smartedms-network
+
+volumes:
+  postgres_data:
+  minio_data:
+  mongodb_data:
+
+networks:
+  smartedms-network:
+    driver: bridge
