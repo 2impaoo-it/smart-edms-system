@@ -35,15 +35,17 @@ public class AdminStorageController {
     @GetMapping("/trash")
     @Operation(summary = "Giám sát Thùng rác Tổng (Global Trash Bin)", description = "Admin xem toàn bộ tài liệu đã xóa mềm của hệ thống.")
     public List<Document> getGlobalTrash(@AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = resolveUserId(userDetails);
-        return documentService.getDeletedDocuments(userId);
+        // resolveUserId để xác thực user có tồn tại, nhưng getDeletedDocuments không cần lọc theo userId (admin xem tất)
+        resolveUserId(userDetails);
+        return documentService.getDeletedDocuments();
     }
 
     @DeleteMapping("/trash/empty")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Dọn dẹp hệ thống", description = "Làm rỗng toàn bộ thùng rác, xóa vĩnh viễn file trên MinIO.")
     public void emptyAllTrash(@AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = resolveUserId(userDetails);
-        documentService.emptyAllTrash(userId);
+        // resolveUserId để xác thực user có tồn tại; emptyAllTrash tự lấy quyền từ SecurityContext
+        resolveUserId(userDetails);
+        documentService.emptyAllTrash();
     }
 }

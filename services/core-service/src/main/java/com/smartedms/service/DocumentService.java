@@ -31,7 +31,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.InputStream;
+
 import java.time.LocalDate;
 import java.util.Locale;
 import java.util.UUID;
@@ -69,7 +69,8 @@ public class DocumentService {
     }
 
     public List<Document> getByFolderId(Long folderId) {
-        return documentRepository.findByFolderIdAndIsDeletedFalse(folderId);
+        return documentRepository.findByFolderIdAndDeletedFalse(folderId);
+    }
 
     @Transactional
     public void softDelete(Long id, Long userId) {
@@ -156,9 +157,23 @@ public class DocumentService {
 
     @Transactional
     public void emptyAllTrash() {
-        List<Document> deletedDocs = documentRepository.findByIsDeletedTrue();
+        // EmptyAllTrash là admin operation - xóa trực tiếp không qua permission check cá nhân
+        List<Document> deletedDocs = documentRepository.findByDeletedTrue();
         for (Document doc : deletedDocs) {
-            hardDeleteDocument(doc.getId(), userId);
+            List<DocumentVersion> versions = documentVersionRepository.findByDocumentIdOrderByVersionNumberDesc(doc.getId());
+            for (DocumentVersion version : versions) {
+                try {
+                    StorageLocation location = resolveLocation(version.getFilePath());
+                    minioClient.removeObject(io.minio.RemoveObjectArgs.builder()
+                            .bucket(location.bucket())
+                            .object(location.objectKey())
+                            .build());
+                } catch (Exception e) {
+                    System.err.println("Failed to delete file from MinIO during emptyTrash: " + version.getFilePath());
+                }
+                documentVersionRepository.delete(version);
+            }
+            documentRepository.delete(doc);
         }
 
         // Audit log – fault tolerant
@@ -192,6 +207,7 @@ public class DocumentService {
 
     public org.springframework.data.domain.Page<Document> searchDocuments(String keyword, Long folderId, com.smartedms.entity.DocumentStatus status, int page, int size) {
         org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
+        // Repository dùng @Param("name") nên truyền keyword vào đúng vị trí tham số name
         return documentRepository.searchDocuments(keyword, folderId, status, pageable);
     }
 
@@ -570,6 +586,17 @@ public class DocumentService {
     }
 
     private void checkDeletePermission(Document document, Long userId) {
+        // Khi userId null (ví dụ từ admin operation) thì chỉ dùng SecurityContext
+        if (userId == null) {
+            boolean isAdmin = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication().getAuthorities()
+                    .stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+            if (!isAdmin) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Không có quyền thực hiện thao tác này");
+            }
+            return;
+        }
+
         if (document.getFolderId() != null) {
             if (!permissionService.hasMinimumPermission(userId, document.getFolderId(), PermissionLevel.EDITOR)) {
                 if (!userId.equals(document.getCreatedBy())) {

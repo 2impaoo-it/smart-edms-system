@@ -46,8 +46,9 @@ public class DocumentController {
     public List<Document> getByFolderId(
             @RequestParam(required = false) Long folderId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = resolveUserId(userDetails);
-        return documentService.getByFolderId(folderId, userId);
+        // userId dùng để validate user tồn tại; getByFolderId chỉ lọc theo folderId
+        resolveUserId(userDetails);
+        return documentService.getByFolderId(folderId);
     }
 
     @PostMapping(consumes = "multipart/form-data")
@@ -212,8 +213,9 @@ public class DocumentController {
     @GetMapping("/trash")
     @Operation(summary = "Danh sách tài liệu đã xóa", description = "Lấy các tài liệu trong thùng rác", security = @SecurityRequirement(name = "bearerAuth"))
     public List<Document> getDeletedDocuments(@AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = resolveUserId(userDetails);
-        return documentService.getDeletedDocuments(userId);
+        // resolveUserId để xác thực; getDeletedDocuments trả về tất cả tài liệu đã xóa
+        resolveUserId(userDetails);
+        return documentService.getDeletedDocuments();
     }
 
     @PutMapping("/{id}/restore")
