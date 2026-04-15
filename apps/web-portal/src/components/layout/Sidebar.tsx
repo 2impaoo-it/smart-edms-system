@@ -76,12 +76,16 @@ export function Sidebar({ role, user, notifications, onMarkAllRead, onNotificati
             ...(role !== 'ADMIN' ? [{ name: "Tài liệu cá nhân", href: "/dashboard/files", icon: FileText }] : []),
             ...(role !== 'ADMIN' ? [{ name: "Kho phòng ban", href: "/dashboard/department", icon: Briefcase }] : []),
             ...(role !== 'ADMIN' ? [{ name: "Thùng rác", href: "/dashboard/recycle-bin", icon: Trash2 }] : []),
+            { name: "Cấu hình quy trình", href: "/dashboard/workflows", icon: CheckCircle2 },
         ],
         MANAGER: [
             { name: "Danh sách trình ký", href: "/dashboard/approvals", icon: PenTool, badge: (pendingCount > 0 && !hasViewedApprovals) ? pendingCount : undefined },
+            { name: "Xét duyệt đa cấp", href: "/dashboard/approval-management", icon: CheckCircle2 },
             { name: "Quản lý chữ ký", href: "/dashboard/signatures", icon: ShieldAlert },
+            { name: "Nhắc hẹn ký", href: "/dashboard/reminders", icon: Bell },
         ],
         ADMIN: [
+            { name: "Nhắc hẹn SMS/Email", href: "/dashboard/reminders", icon: Bell },
             { name: "Quản lý người dùng", href: "/dashboard/users", icon: Users },
             { name: "Log hệ thống", href: "/dashboard/audit-logs", icon: History },
             { name: "Kho tài liệu tổng", href: "/dashboard/storage", icon: Database },

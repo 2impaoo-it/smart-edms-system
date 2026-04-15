@@ -29,6 +29,23 @@ public class Document {
     @Column(name = "status", nullable = false)
     private DocumentStatus status = DocumentStatus.DRAFT;
 
+    // Thêm: ID của chuỗi duyệt được gán cho document này
+    @Column(name = "approval_workflow_id")
+    private Long approvalWorkflowId;
+
+    // Thêm: Level duyệt hiện tại (1, 2, 3, ...)
+    @Column(name = "current_approval_level")
+    private Integer currentApprovalLevel;
+
+    // Thêm: Lý do từ chối (nếu có)
+    @Column(columnDefinition = "TEXT")
+    private String rejectionReason;
+
+    // Thêm: Hạn duyệt
+    @Column(name = "approval_due_date")
+    private LocalDateTime approvalDueDate;
+
+    // Cũ: người duyệt (nếu cần giữ lại)
     @Column(name = "approver_id")
     private Long approverId;
 

@@ -56,8 +56,10 @@ public class DocumentSigningService {
         DocumentVersion currentVersion = documentVersionRepository.findByDocumentIdAndIsCurrentTrue(documentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document version not found"));
 
-        if (document.getStatus() != com.smartedms.entity.DocumentStatus.PENDING_APPROVAL) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tài liệu không ở trạng thái chờ duyệt");
+        if (document.getStatus() != com.smartedms.entity.DocumentStatus.PENDING_APPROVAL && 
+            document.getStatus() != com.smartedms.entity.DocumentStatus.REVIEW &&
+            document.getStatus() != com.smartedms.entity.DocumentStatus.APPROVE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tài liệu không ở trạng thái cho phép ký (Yêu cầu: Chờ duyệt hoặc Đã duyệt)");
         }
 
         if (!userId.equals(document.getApproverId())) {
@@ -104,7 +106,9 @@ public class DocumentSigningService {
             newVersion.setCurrent(true);
             
             // 7. Update Document Status (nếu hệ thống có trường status, ở đây dùng name tạm ghi là đã ký hoặc thực tế để Audit Log).
-            document.setStatus(com.smartedms.entity.DocumentStatus.SIGNED);
+            if (document.getStatus() == com.smartedms.entity.DocumentStatus.APPROVE) {
+                document.setStatus(com.smartedms.entity.DocumentStatus.SIGNED);
+            }
             documentRepository.save(document);
             
             String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
@@ -132,8 +136,10 @@ public class DocumentSigningService {
         DocumentVersion currentVersion = documentVersionRepository.findByDocumentIdAndIsCurrentTrue(documentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document version not found"));
 
-        if (document.getStatus() != com.smartedms.entity.DocumentStatus.PENDING_APPROVAL) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tài liệu không ở trạng thái chờ duyệt");
+        if (document.getStatus() != com.smartedms.entity.DocumentStatus.PENDING_APPROVAL && 
+            document.getStatus() != com.smartedms.entity.DocumentStatus.REVIEW &&
+            document.getStatus() != com.smartedms.entity.DocumentStatus.APPROVE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tài liệu không ở trạng thái cho phép ký (Yêu cầu: Chờ duyệt hoặc Đã duyệt)");
         }
 
         if (!userId.equals(document.getApproverId())) {
@@ -203,7 +209,9 @@ public class DocumentSigningService {
             newVersion.setCreatedBy(userId);
             newVersion.setCurrent(true);
             
-            document.setStatus(com.smartedms.entity.DocumentStatus.APPROVED);
+            if (document.getStatus() == com.smartedms.entity.DocumentStatus.APPROVE) {
+                document.setStatus(com.smartedms.entity.DocumentStatus.SIGNED);
+            }
             documentRepository.save(document);
             
             String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();

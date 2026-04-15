@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import type { UserRole } from "../../lib/types";
 import { FileExplorer } from "../../pages/FileExplorer";
@@ -11,6 +11,8 @@ import { SystemLogs } from "../../pages/SystemLogs";
 import { Settings } from "../../pages/Settings";
 import { RecycleBin } from "../../pages/RecycleBin";
 import { SignatureManagement } from "../../pages/SignatureManagement";
+import ApprovalManagementPage from "../../pages/ApprovalManagement";
+import { ReminderManagement } from "../../pages/ReminderManagement";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { gooeyToast as toast } from "goey-toast";
 
@@ -231,6 +233,16 @@ export function MainLayout() {
         if (location.pathname === '/dashboard/recycle-bin') return <RecycleBin />;
         if (location.pathname === '/dashboard/audit-logs') return <SystemLogs />;
         if (location.pathname === '/dashboard/approvals') return <Approvals />;
+        if (location.pathname === '/dashboard/approval-management') return <ApprovalManagementPage />;
+        if (location.pathname === '/dashboard/workflows') {
+            const WorkflowManagementPage = React.lazy(() => import('../../pages/WorkflowManagement'));
+            return (
+                <React.Suspense fallback={<PlaceholderPage title="Đang tải cấu hình..." />}>
+                    <WorkflowManagementPage />
+                </React.Suspense>
+            );
+        }
+        if (location.pathname === '/dashboard/reminders') return <ReminderManagement />;
         if (location.pathname === '/dashboard/signatures') return <SignatureManagement />;
         if (location.pathname === '/dashboard/users') return <UserManagement />;
         if (location.pathname === '/dashboard/storage') return <StorageManagement />;

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from "react-dom";
-import { Clock, FileText, CheckCircle, XCircle, Search, PenTool, X, ShieldAlert } from 'lucide-react';
+import { Clock, FileText, CheckCircle, XCircle, Search, PenTool, X, ShieldAlert, List } from 'lucide-react';
 import { gooeyToast as toast } from "goey-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { getPendingApprovals, getDocumentStreamUrl, signDocument, rejectDocument, approveDocument } from '../services/documentService';
-import { getOrgChart } from '../services/userService';
+import { getPendingApprovalsForMe, processApprovalAction, getApprovalHistory } from '../services/approvalService';
+import { getDocumentStreamUrl, signDocument } from '../services/documentService';
 import type { FileItem } from '../lib/types';
 
 export const Approvals = () => {
@@ -22,30 +22,29 @@ export const Approvals = () => {
     const [signReason, setSignReason] = useState("Phê duyệt chuyên môn");
     const [signP12File, setSignP12File] = useState<File | null>(null);
 
+    // Dynamic Approval State
+    const [documentApprovalHistory, setDocumentApprovalHistory] = useState<any[]>([]);
+    const [showApprovalPath, setShowApprovalPath] = useState(false);
+    const [currentStepInfo, setCurrentStepInfo] = useState<any>(null);
+
     const fetchApprovals = async () => {
         setIsLoading(true);
         try {
-            const [approvalsRes, usersRes] = await Promise.all([
-                getPendingApprovals(),
-                getOrgChart()
-            ]);
+            const res = await getPendingApprovalsForMe();
+            const rawData = Array.isArray(res.data) ? res.data : [];
             
-            const usersData = Array.isArray(usersRes.data) ? usersRes.data : [];
-
-            // Map data
-            const rawDocs = Array.isArray(approvalsRes.data) ? approvalsRes.data : (approvalsRes.data?.content || []);
-            const mapped = rawDocs.map((doc: any) => {
-                const owner = usersData.find((u: any) => u.id === doc.createdBy);
-                return {
-                    id: String(doc.id),
-                    name: doc.name,
-                    type: 'file',
-                    size: doc.fileSize ? `${(doc.fileSize / 1024).toFixed(1)} KB` : '--',
-                    updatedAt: new Date(doc.createdAt).toLocaleDateString(),
-                    owner: owner ? (owner.fullName || owner.username) : `ID: ${doc.createdBy}`,
-                    status: doc.status || 'PENDING_APPROVAL'
-                };
-            });
+            // Map ApprovalHistoryDTO to a format suitable for the table
+            const mapped = rawData.map((item: any) => ({
+                id: String(item.documentId), // Use documentId as the primary ID for viewing
+                historyId: item.id,
+                name: item.documentName || "Document",
+                type: 'pdf' as const,
+                size: '--',
+                updatedAt: item.reviewedAt ? new Date(item.reviewedAt).toLocaleDateString() : 'Chờ duyệt',
+                owner: item.approverName || 'N/A',
+                status: 'PENDING_APPROVAL' as const,
+                requireSignature: item.requireSignature
+            }));
             setApprovals(mapped);
         } catch (error) {
             console.error("Fetch pending approvals err:", error);
@@ -59,12 +58,24 @@ export const Approvals = () => {
         fetchApprovals();
     }, []);
 
-    // Load PDF when viewFileId changes
+    // Load PDF and History when viewFileId changes
     useEffect(() => {
         if (!viewFileId) {
             setPdfUrl(null);
+            setDocumentApprovalHistory([]);
+            setShowApprovalPath(false);
+            setCurrentStepInfo(null);
             return;
         }
+
+        // Find the specific approval info for this document in the list
+        const info = approvals.find(a => a.id === viewFileId);
+        setCurrentStepInfo(info);
+
+        // Fetch Full History
+        getApprovalHistory(Number(viewFileId)).then(res => {
+            setDocumentApprovalHistory(res.data || []);
+        }).catch(console.error);
 
         let blobUrl: string | null = null;
         const fetchPdf = async () => {
@@ -83,11 +94,16 @@ export const Approvals = () => {
         return () => {
             if (blobUrl) URL.revokeObjectURL(blobUrl);
         };
-    }, [viewFileId]);
+    }, [viewFileId, approvals]);
 
     const handleReject = async (id: string) => {
         try {
-            await rejectDocument(id);
+            await processApprovalAction({
+                documentId: Number(id),
+                approved: false,
+                rejectionReason: "Từ chối duyệt tài liệu này",
+                comments: "Người duyệt đã chọn từ chối qua trang quản lý phê duyệt"
+            });
             toast.success("Từ chối thành công", { description: "Tài liệu đã được trả lại cho người trình ký." });
             fetchApprovals();
             setViewFileId(null);
@@ -98,8 +114,12 @@ export const Approvals = () => {
 
     const handleApproveWithoutSign = async (id: string) => {
         try {
-            await approveDocument(id);
-            toast.success("Phê duyệt thành công", { description: "Tài liệu đã được duyệt mà không cần chữ ký số." });
+            await processApprovalAction({
+                documentId: Number(id),
+                approved: true,
+                comments: "Đã phê duyệt (Duyệt nhanh hồ sơ)"
+            });
+            toast.success("Phê duyệt thành công", { description: "Tài liệu đã được duyệt mã không cần chữ ký số." });
             fetchApprovals();
             setViewFileId(null);
         } catch (e: any) {
@@ -129,6 +149,17 @@ export const Approvals = () => {
 
         try {
             await signTask;
+            // Cập nhật trạng thái workflow
+            try {
+                await processApprovalAction({
+                    documentId: Number(viewFileId),
+                    approved: true,
+                    comments: signReason || "Đã ký số tài liệu qua trang Quản lý Phê duyệt"
+                });
+            } catch (workflowErr) {
+                console.error("Workflow update error:", workflowErr);
+            }
+
             setIsSignModalOpen(false);
             setSignP12File(null);
             setSignPassword("");
@@ -244,18 +275,29 @@ export const Approvals = () => {
                                         <div className="p-2 bg-primary/10 text-primary rounded-xl"><FileText className="w-5 h-5" /></div>
                                         <div>
                                             <h3 className="font-black text-lg">{fileToView.name}</h3>
-                                            <p className="text-[10px] font-bold text-warning uppercase tracking-widest mt-1">
-                                                Trạng thái: Đang chờ duyệt
-                                            </p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <p className="text-[10px] font-bold text-warning uppercase tracking-widest">
+                                                    Trạng thái: Đang chờ duyệt
+                                                </p>
+                                                {currentStepInfo?.requireSignature && (
+                                                    <span className="text-[9px] font-black px-1.5 py-0.5 bg-primary/10 text-primary rounded border border-primary/20 uppercase tracking-tighter italic">Bắt buộc Ký Số</span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
-                                        <button onClick={() => setIsSignModalOpen(true)} className="p-3 bg-primary text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
-                                            <PenTool className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Ký Số Ngay</span>
+                                        <button onClick={() => setShowApprovalPath(!showApprovalPath)} className="p-3 bg-secondary text-secondary-foreground rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                                            <List className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Luồng Duyệt</span>
                                         </button>
-                                        <button onClick={() => handleApproveWithoutSign(fileToView.id)} className="p-3 bg-success text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Duyệt nhanh</span>
-                                        </button>
+                                        {currentStepInfo?.requireSignature ? (
+                                            <button onClick={() => setIsSignModalOpen(true)} className="p-3 bg-primary text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2 shadow-neon">
+                                                <PenTool className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Ký Số & Phê Duyệt</span>
+                                            </button>
+                                        ) : (
+                                            <button onClick={() => handleApproveWithoutSign(fileToView.id)} className="p-3 bg-success text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                                                <CheckCircle className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Duyệt nhanh</span>
+                                            </button>
+                                        )}
                                         <button onClick={() => handleReject(fileToView.id)} className="p-3 bg-destructive text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
                                             <XCircle className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Từ chối</span>
                                         </button>
@@ -264,16 +306,86 @@ export const Approvals = () => {
                                         </button>
                                     </div>
                                 </div>
-                                <div className="flex-1 bg-slate-200/50 flex items-center justify-center p-8 overflow-auto">
-                                    {pdfUrl ? (
-                                        <iframe src={pdfUrl} className="w-full h-full rounded-xl shadow-xl border-0 bg-white" title="PDF Viewer" />
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-2xl shadow-xl min-h-[400px] w-full max-w-2xl">
-                                            <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin mb-6" />
-                                            <h3 className="text-xl font-black mb-2">Đang tải tài liệu...</h3>
-                                        </div>
-                                    )}
+                                <div className="flex flex-1 overflow-hidden">
+                                    <div className={`flex-1 bg-slate-200/50 flex items-center justify-center p-8 overflow-auto transition-all duration-300 ${showApprovalPath ? 'w-2/3' : 'w-full'}`}>
+                                        {pdfUrl ? (
+                                            <iframe src={`${pdfUrl}#t=${Date.now()}`} className="w-full h-full rounded-xl shadow-xl border-0 bg-white" title="PDF Viewer" />
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-2xl shadow-xl min-h-[400px] w-full max-w-2xl">
+                                                <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin mb-6" />
+                                                <h3 className="text-xl font-black mb-2">Đang tải tài liệu...</h3>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <AnimatePresence>
+                                        {showApprovalPath && (
+                                            <motion.div 
+                                                initial={{ width: 0, opacity: 0 }}
+                                                animate={{ width: 350, opacity: 1 }}
+                                                exit={{ width: 0, opacity: 0 }}
+                                                className="border-l border-slate-200 bg-slate-50 flex flex-col shrink-0"
+                                            >
+                                                <div className="p-4 font-black text-sm border-b border-slate-200 bg-white flex justify-between items-center">
+                                                    <span>Lịch Sử Luồng Duyệt</span>
+                                                    <button onClick={() => setShowApprovalPath(false)} className="p-1 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4"/></button>
+                                                </div>
+                                                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                                    {documentApprovalHistory.length === 0 ? (
+                                                        <p className="text-xs text-muted-foreground text-center mt-4">Chưa có luồng duyệt nào được cấu hình</p>
+                                                    ) : (
+                                                        documentApprovalHistory.map((step, idx) => (
+                                                            <div key={step.id} className="relative pl-6">
+                                                                {/* Timeline vertical line */}
+                                                                {idx < documentApprovalHistory.length - 1 && (
+                                                                    <div className="absolute left-[9px] top-6 bottom-[-24px] w-px bg-slate-200"></div>
+                                                                )}
+                                                                
+                                                                {/* Timeline dot */}
+                                                                <div className={`absolute left-0 top-1.5 w-[19px] h-[19px] rounded-full border-4 border-slate-50 z-10 flex items-center justify-center
+                                                                    ${step.status === 'APPROVED' ? 'bg-success' : 
+                                                                    step.status === 'REJECTED' ? 'bg-destructive' : 
+                                                                    'bg-slate-300'}`}
+                                                                ></div>
+                                                                
+                                                                <div className="bg-white border text-left border-slate-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow">
+                                                                    <div className="flex justify-between items-start mb-1">
+                                                                        <span className="text-[10px] font-black uppercase text-primary tracking-wider">Cấp duyệt {step.approvalLevel}</span>
+                                                                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${step.status === 'APPROVED' ? 'bg-success/10 text-success' : step.status === 'REJECTED' ? 'bg-destructive/10 text-destructive' : 'bg-warning/10 text-warning'}`}>
+                                                                            {step.status === 'APPROVED' ? 'Đã duyệt' : step.status === 'REJECTED' ? 'Từ chối' : 'Chờ duyệt'}
+                                                                        </span>
+                                                                    </div>
+                                                                    <h4 className="text-xs font-bold text-slate-800">{step.approverName}</h4>
+                                                                    <p className="text-[10px] text-slate-500 font-medium mb-2">{step.approverJobTitle}</p>
+                                                                    
+                                                                    <div className="flex items-center gap-1.5 mb-2">
+                                                                        <span className="text-[10px] font-medium text-slate-600 border border-slate-200 bg-slate-50 px-1.5 py-0.5 rounded-md">
+                                                                            Yêu cầu tác vụ: <strong className="text-slate-800">{step.requireSignature ? "KÝ SỐ" : "PHÊ DUYỆT"}</strong>
+                                                                        </span>
+                                                                    </div>
+
+                                                                    {step.reviewedAt && (
+                                                                        <div className="text-[9px] text-slate-400 font-medium mb-1 flex items-center gap-1">
+                                                                            <Clock className="w-3 h-3" />
+                                                                            {new Date(step.reviewedAt).toLocaleString('vi-VN')}
+                                                                        </div>
+                                                                    )}
+                                                                    
+                                                                    {step.comments && (
+                                                                        <p className="text-[10px] text-slate-600 bg-slate-50 p-2 rounded-lg mt-2 border border-slate-100 italic">"{step.comments}"</p>
+                                                                    )}
+                                                                    {step.rejectionReason && (
+                                                                        <p className="text-[10px] text-destructive bg-destructive/5 p-2 rounded-lg mt-2 border border-destructive/10 font-bold">Lý do từ chối: {step.rejectionReason}</p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
+
                             </motion.div>
                         </div>
                     )}

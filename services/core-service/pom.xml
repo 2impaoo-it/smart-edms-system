@@ -43,6 +43,12 @@
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
 
+		<!-- Spring Mail: Bắt buộc cho EmailService (JavaMailSender, SimpleMailMessage, MimeMessage) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
@@ -92,7 +98,6 @@
 			<artifactId>bcpkix-jdk18on</artifactId>
 			<version>1.78.1</version>
 		</dependency>
-
 		<!-- Apache PDFBox for PDF Signing -->
 		<dependency>
 			<groupId>org.apache.pdfbox</groupId>

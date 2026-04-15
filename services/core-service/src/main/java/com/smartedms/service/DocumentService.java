@@ -31,7 +31,6 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.InputStream;
 import java.time.LocalDate;
 import java.util.Locale;
 import java.util.UUID;
@@ -506,7 +505,10 @@ public class DocumentService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
 
         if (document.getFolderId() != null && !permissionService.hasMinimumPermission(userId, document.getFolderId(), PermissionLevel.VIEWER)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền xem tài liệu này");
+            // Cho phép người duyệt hiện tại cũng xem được file
+            if (!userId.equals(document.getApproverId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền xem tài liệu này");
+            }
         }
 
         DocumentVersion currentVersion = documentVersionRepository.findByDocumentIdAndIsCurrentTrue(id)
@@ -521,7 +523,10 @@ public class DocumentService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
 
         if (document.getFolderId() != null && !permissionService.hasMinimumPermission(userId, document.getFolderId(), PermissionLevel.VIEWER)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền xem tài liệu này");
+            // Cho phép người duyệt hiện tại cũng xem được các phiên bản file
+            if (!userId.equals(document.getApproverId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền xem tài liệu này");
+            }
         }
 
         DocumentVersion version = documentVersionRepository.findById(versionId)

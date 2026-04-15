@@ -41,6 +41,15 @@ public class User {
     @Column(name = "is_active", columnDefinition = "boolean default true")
     private boolean isActive = true;
 
+    // Khóa bí mật TOTP (Base32) dùng để đồng bộ với Microsoft/Google Authenticator
+    @Column(name = "mfa_secret")
+    private String mfaSecret;
+
+    // Cờ xác nhận user đã setup Authenticator app thành công (quét QR + verify lần đầu)
+    @Column(name = "mfa_enabled", columnDefinition = "boolean default false")
+    private boolean mfaEnabled = false;
+
+
     @ElementCollection(fetch = FetchType.EAGER)
     @Enumerated(EnumType.STRING)
     @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))

@@ -6,6 +6,7 @@ import com.smartedms.entity.*;
 import com.smartedms.repository.CategoryRepository;
 import com.smartedms.repository.DocumentRepository;
 import com.smartedms.repository.FolderPermissionRepository;
+import com.smartedms.repository.SecureFolderRepository;
 import com.smartedms.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ public class CategoryService {
     private final FolderPermissionRepository permissionRepository;
     private final FolderPermissionService permissionService;
     private final UserRepository userRepository;
+    private final SecureFolderRepository secureFolderRepository;
     private final AuditLogPublisherService auditLogPublisherService;
 
     public CategoryService(CategoryRepository folderRepository,
@@ -33,12 +35,14 @@ public class CategoryService {
                            FolderPermissionRepository permissionRepository,
                            FolderPermissionService permissionService,
                            UserRepository userRepository,
+                           SecureFolderRepository secureFolderRepository,
                            AuditLogPublisherService auditLogPublisherService) {
         this.folderRepository = folderRepository;
         this.documentRepository = documentRepository;
         this.permissionRepository = permissionRepository;
         this.permissionService = permissionService;
         this.userRepository = userRepository;
+        this.secureFolderRepository = secureFolderRepository;
         this.auditLogPublisherService = auditLogPublisherService;
     }
 
@@ -105,23 +109,42 @@ public class CategoryService {
     }
 
     public List<Category> getByParentId(Long parentId, String folderType, Long ownerId) {
+        List<Category> results;
         // Nếu có folderType filter, lọc theo đó
         if (folderType != null && !folderType.isBlank()) {
             FolderType type = parseFolderType(folderType);
             if (ownerId != null && type == FolderType.PERSONAL) {
                 // Tài liệu cá nhân: chỉ lấy folder do user sở hữu
-                return folderRepository.findByParentIdAndOwnerIdAndFolderTypeAndDeletedFalse(parentId, ownerId, type);
-            }
-            if (ownerId != null && type == FolderType.DEPARTMENT) {
+                results = folderRepository.findByParentIdAndOwnerIdAndFolderTypeAndDeletedFalse(parentId, ownerId, type);
+            } else if (ownerId != null && type == FolderType.DEPARTMENT) {
                 // Lọc thư mục phòng ban: user là owner HOẶC có quyền truy cập
                 List<Category> allDepts = folderRepository.findByParentIdAndFolderTypeAndDeletedFalse(parentId, type);
-                return allDepts.stream()
+                results = allDepts.stream()
                         .filter(cat -> objEquals(cat.getOwnerId(), ownerId) || permissionService.hasPermission(ownerId, cat.getId()))
                         .collect(Collectors.toList());
+            } else {
+                results = folderRepository.findByParentIdAndFolderTypeAndDeletedFalse(parentId, type);
             }
-            return folderRepository.findByParentIdAndFolderTypeAndDeletedFalse(parentId, type);
+        } else {
+            results = folderRepository.findByParentIdAndDeletedFalse(parentId);
         }
-        return folderRepository.findByParentIdAndDeletedFalse(parentId);
+
+        // Populate isSecured flag
+        populateIsSecured(results);
+        return results;
+    }
+
+    private void populateIsSecured(List<Category> categories) {
+        if (categories == null || categories.isEmpty()) return;
+        List<Long> categoryIds = categories.stream().map(Category::getId).collect(Collectors.toList());
+        List<SecureFolder> secured = secureFolderRepository.findByCategoryIdIn(categoryIds);
+        Set<Long> securedIds = secured.stream()
+                .filter(s -> s.getStatus() == SecureFolderStatus.ACTIVE)
+                .map(SecureFolder::getCategoryId)
+                .collect(Collectors.toSet());
+        for (Category cat : categories) {
+            cat.setIsSecured(securedIds.contains(cat.getId()));
+        }
     }
 
     private boolean objEquals(Long a, Long b) {

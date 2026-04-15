@@ -8,6 +8,8 @@ import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -51,4 +53,8 @@ public class Category {
     @Column(name = "updated_by")
     private Long updatedBy;
 
+    // Transient flag to indicate if folder is protected by PIN (SecureFolder)
+    @Transient
+    @JsonProperty("isSecured")
+    private Boolean isSecured = false;
 }

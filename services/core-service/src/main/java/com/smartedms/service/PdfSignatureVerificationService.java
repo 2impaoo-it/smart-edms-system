@@ -19,6 +19,8 @@ import java.util.List;
 @Service
 public class PdfSignatureVerificationService {
 
+    // Bouncy Castle API trả raw Collection/Selector nên cần suppress unchecked warning
+    @SuppressWarnings("unchecked")
     public List<SignatureVerificationResult> verifySignatures(InputStream pdfStream) throws Exception {
         byte[] pdfBytes = pdfStream.readAllBytes();
         List<SignatureVerificationResult> results = new ArrayList<>();

@@ -17,10 +17,12 @@ export interface FileItem {
     size?: string;
     owner: string;
     updatedAt: string;
-    parentId: string | null;
+    parentId?: string | null;
     status?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'SIGNED' | 'REJECTED';
     isDeleted?: boolean;
     deletedAt?: string;
+    isSecured?: boolean;
+    approverId?: string;
 }
 
 export type Severity = 'CRITICAL' | 'WARNING' | 'INFO' | 'SUCCESS';

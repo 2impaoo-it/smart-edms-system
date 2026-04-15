@@ -3,6 +3,7 @@ import { X, ZoomIn, ZoomOut, PenTool, CheckCircle2, Info, Trash2, ChevronLeft, C
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "../lib/utils";
 import { approveDocument, visualSignDocument, getDocumentById, getDocumentStreamUrl } from "../services/documentService";
+import { processApprovalAction } from "../services/approvalService";
 import { gooeyToast as toast } from "goey-toast";
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -125,10 +126,28 @@ export function SignerWorkspace({ fileId, onClose, onSignSuccess }: { fileId: st
                     height: sig.height / scale,
                     pageNumber: pageNumber
                 });
+                // Nối tiếp quá trình duyệt/chuyển người
+                if (docData?.approvalWorkflowId) {
+                    await processApprovalAction({
+                        documentId: Number(fileId),
+                        approved: true,
+                        comments: "Đã ký kiểm duyệt thành công"
+                    });
+                } else {
+                    await approveDocument(fileId);
+                }
             } else {
-                await approveDocument(fileId);
+                if (docData?.approvalWorkflowId) {
+                    await processApprovalAction({
+                        documentId: Number(fileId),
+                        approved: true,
+                        comments: "Đã xem xét và thông qua"
+                    });
+                } else {
+                    await approveDocument(fileId);
+                }
             }
-            toast.success("Đã phê duyệt tài liệu thành công");
+            toast.success("Đã hoàn tất duyệt và chuyển hồ sơ thành công");
             onSignSuccess?.(fileId);
             onClose();
         } catch (error: any) {

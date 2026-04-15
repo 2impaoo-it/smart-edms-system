@@ -50,6 +50,7 @@ import {
 import { getOrgChart } from "../services/userService";
 import { initSocket, disconnectSocket } from "../services/socketService";
 import { gooeyToast as toast } from "goey-toast";
+import { triggerReminderCheck } from "../services/otpReminderService";
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
@@ -66,6 +67,7 @@ export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: 
     const [logs, setLogs] = useState<any[]>([]);
     const [health, setHealth] = useState<any>({ database: "OPTIMAL", "spring-boot": "OPTIMAL", minio: "OPTIMAL" });
     const [totalUsers, setTotalUsers] = useState(0);
+    const [triggerLoading, setTriggerLoading] = useState(false);
     
     // Analytics State
     const [activityData, setActivityData] = useState<any[]>([]);
@@ -196,8 +198,41 @@ export function AdminDashboard({ onNavigate }: { user?: any, onNavigate: (path: 
         }
     };
 
+    const handleTriggerReminders = async () => {
+        setTriggerLoading(true);
+        try {
+            await triggerReminderCheck();
+            toast.success("✅ Đã quét và gửi Email nhắc hẹn!", { description: "Email đang lọt qua hàng đợi để đến người cần duyệt." });
+        } catch {
+            toast.error("Lỗi khi gửi email", { description: "Vui lòng xem lại logs hệ thống." });
+        } finally {
+            setTriggerLoading(false);
+        }
+    };
+
     return (
         <div className="space-y-6 lg:space-y-8 animate-in fade-in duration-700 pb-20">
+            {/* Header / Quick Actions */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h2 className="text-3xl font-black tracking-tighter uppercase italic gradient-text">Tổng Quan Hệ Thống</h2>
+                    <p className="text-sm text-muted-foreground font-medium">Bảng điều khiển quản trị trung tâm dành cho ROOT ADMIN</p>
+                </div>
+                <div className="flex gap-2 w-full sm:w-auto">
+                    <button 
+                        onClick={handleTriggerReminders}
+                        disabled={triggerLoading}
+                        className="flex-1 sm:flex-none cyber-gradient text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase shadow-neon hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 tracking-widest"
+                    >
+                        <Zap className={cn("w-4 h-4 fill-white", triggerLoading && "animate-pulse")} /> 
+                        {triggerLoading ? "Đang Quét..." : "Bấm Gửi Mail Nhắc Hẹn Cấp Tốc"}
+                    </button>
+                    <button onClick={() => onNavigate('/dashboard/reminders')} className="glass-panel px-5 py-3 rounded-2xl text-[10px] font-black uppercase text-muted-foreground hover:text-primary hover:bg-white transition-all shadow-sm flex items-center justify-center gap-2">
+                        Truy Xuất
+                    </button>
+                </div>
+            </div>
+
             {/* Stats Overview */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
                 {[

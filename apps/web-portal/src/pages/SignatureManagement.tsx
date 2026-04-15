@@ -6,6 +6,7 @@ import {
 import { gooeyToast as toast } from "goey-toast";
 import { cn } from "../lib/utils";
 import { generateKeystore, verifyKeystore, verifyPdf } from "../services/signatureService";
+import { OtpVerificationModal } from "../components/OtpVerification/OtpVerificationModal";
 
 type SigTab = "generate" | "verify-keystore" | "verify-pdf";
 
@@ -27,6 +28,11 @@ export function SignatureManagement() {
     return () => window.removeEventListener('user-updated', handleUpdate);
   }, []);
 
+  // OTP State (xác thực trước khi cấp chứng thư)
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [pendingGenName, setPendingGenName] = useState("");
+  const [pendingGenPass, setPendingGenPass] = useState("");
+
   // Generate State
   const [genName, setGenName] = useState(user?.fullName || user?.username || "");
   const [genPass, setGenPass] = useState("");
@@ -43,15 +49,23 @@ export function SignatureManagement() {
   const [pdfResults, setPdfResults] = useState<any[] | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
-  // ─── Generate Keystore ───
+  // ─── Bước 1: Submit form → Mở OTP modal trước ───
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!genName || !genPass) return;
-    
+    // Lưu lại thông tin đang chờ xác thực OTP
+    setPendingGenName(genName);
+    setPendingGenPass(genPass);
+    setShowOtpModal(true);
+  };
+
+  // ─── Bước 2: OTP verified → Thực sự tạo keystore ───
+  const handleOtpVerified = async (_otpToken: string) => {
+    setShowOtpModal(false);
     setIsGenerating(true);
     const tId = toast("Đang khởi tạo chứng thư...", { duration: 30000 });
     try {
-        const blob = await generateKeystore(genName, genPass);
+        const blob = await generateKeystore(pendingGenName, pendingGenPass);
         toast.dismiss(tId);
         toast.success("Khởi tạo thành công!", { description: "Vui lòng lưu giữ file .p12 cẩn thận." });
         
@@ -65,7 +79,7 @@ export function SignatureManagement() {
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', `${genName.replace(/\s+/g, '_')}_signature.p12`);
+        link.setAttribute('download', `${pendingGenName.replace(/\s+/g, '_')}_signature.p12`);
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -73,6 +87,8 @@ export function SignatureManagement() {
         
         setGenName("");
         setGenPass("");
+        setPendingGenName("");
+        setPendingGenPass("");
         setActiveTab("verify-keystore");
     } catch (err: any) {
         toast.dismiss(tId);
@@ -349,6 +365,21 @@ export function SignatureManagement() {
             )}
           </div>
         </div>
+      )}
+
+      {/* OTP Modal */}
+      {showOtpModal && (
+        <OtpVerificationModal
+          purpose="DIGITAL_CERT_CREATION"
+          purposeLabel="Tạo Chứng Thư Số Mới"
+          defaultMethod="MICROSOFT_AUTH"
+          onVerified={handleOtpVerified}
+          onClose={() => {
+            setShowOtpModal(false);
+            setPendingGenName("");
+            setPendingGenPass("");
+          }}
+        />
       )}
     </div>
   );

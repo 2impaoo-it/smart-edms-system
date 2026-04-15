@@ -12,8 +12,11 @@ import { Approvals } from "./pages/Approvals";
 import { UserManagement } from "./pages/UserManagement";
 import { SignatureManagement } from "./pages/SignatureManagement";
 import { RecycleBin } from "./pages/RecycleBin";
+import ApprovalManagementPage from "./pages/ApprovalManagement";
+import { ReminderManagement } from "./pages/ReminderManagement";
 import { SystemLogs } from "./pages/SystemLogs";
 import { StorageManagement } from "./pages/StorageManagement";
+import WorkflowManagementPage from "./pages/WorkflowManagement";
 
 const router = createBrowserRouter([
     {
@@ -54,6 +57,18 @@ const router = createBrowserRouter([
                     {
                         path: "signatures",
                         element: <SignatureManagement />,
+                    },
+                    {
+                        path: "approval-management",
+                        element: <ApprovalManagementPage />,
+                    },
+                    {
+                        path: "workflows",
+                        element: <WorkflowManagementPage />,
+                    },
+                    {
+                        path: "reminders",
+                        element: <ReminderManagement />,
                     },
                     {
                         path: "users",

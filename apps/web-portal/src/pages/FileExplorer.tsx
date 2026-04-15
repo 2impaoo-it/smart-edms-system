@@ -29,8 +29,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { FileItem, User } from "../lib/types";
 import { cn } from "../lib/utils";
 import { getFolderContents, createFolder, deleteFolder, getPersonalTree, getDepartmentTree, shareFolder, renameFolder } from "../services/folderService";
-import { uploadDocument, getDocumentStreamUrl, getFolderDocuments, deleteDocument, getDocumentVersions, getDocumentVersionStreamUrl, uploadNewDocumentVersion, signDocument, submitForApproval, rejectDocument, approveDocument, renameDocument } from "../services/documentService";
+import { uploadDocument, getDocumentStreamUrl, getFolderDocuments, deleteDocument, getDocumentVersions, getDocumentVersionStreamUrl, uploadNewDocumentVersion, signDocument, renameDocument } from "../services/documentService";
+import { submitForApproval, getAllWorkflows, getApprovalHistory, processApprovalAction } from "../services/approvalService";
 import { getOrgChart } from "../services/userService";
+import { EnablePinModal, DisablePinModal, ChangePinModal, VerifyPinModal } from "../components/SecureFolder/PinModals";
 
 interface FileExplorerProps {
     title: string;
@@ -114,7 +116,59 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
 
     // Submit Approval Modal State
     const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
-    const [approverId, setApproverId] = useState("");
+    const [workflowId, setWorkflowId] = useState("");
+    const [workflows, setWorkflows] = useState<any[]>([]);
+    const [levelOverrides, setLevelOverrides] = useState<Record<number, boolean>>({});
+    const [currentRequireSignature, setCurrentRequireSignature] = useState<boolean | null>(null);
+    const [documentApprovalHistory, setDocumentApprovalHistory] = useState<any[]>([]);
+    const [showApprovalPath, setShowApprovalPath] = useState(false);
+
+    const handleWorkflowChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const wfId = e.target.value;
+        setWorkflowId(wfId);
+        setLevelOverrides({});
+        const wf = workflows.find(w => String(w.id) === String(wfId));
+        if (wf && wf.approvalLevels) {
+            const initialOverrides: Record<number, boolean> = {};
+            wf.approvalLevels.forEach((l: any) => {
+                initialOverrides[l.levelOrder] = false;
+            });
+            setLevelOverrides(initialOverrides);
+        }
+    };
+
+    useEffect(() => {
+        if (isSubmitModalOpen) {
+            getAllWorkflows().then(res => setWorkflows(res.data)).catch(console.error);
+        }
+    }, [isSubmitModalOpen]);
+
+    useEffect(() => {
+        if (viewFileId) {
+            const file = files.find(f => f.id.replace('folder_', '').replace('doc_', '') === String(viewFileId));
+            if (file && (file.status === 'PENDING_APPROVAL' || file.status === 'APPROVED' || file.status === 'SIGNED' || file.status === 'REJECTED')) {
+                // Ensure we use the raw ID
+                const rawId = viewFileId.replace('doc_', '').replace('folder_', '');
+                getApprovalHistory(Number(rawId)).then(res => {
+                    const history = res.data;
+                    setDocumentApprovalHistory(history);
+                    const pendingStep = history.find((h: any) => h.status === 'PENDING' && String(h.approverId) === String(user?.id));
+                    if (pendingStep) {
+                        setCurrentRequireSignature(pendingStep.requireSignature || false);
+                    } else {
+                        setCurrentRequireSignature(null);
+                    }
+                }).catch(console.error);
+            } else {
+                setCurrentRequireSignature(null);
+                setDocumentApprovalHistory([]);
+            }
+        } else {
+            setCurrentRequireSignature(null);
+            setDocumentApprovalHistory([]);
+            setShowApprovalPath(false);
+        }
+    }, [viewFileId, files, user?.id]);
 
     // Share Folder Modal State
     const [shareFolderId, setShareFolderId] = useState<string | null>(null);
@@ -129,6 +183,12 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
 
     // System Users for Dropdown
     const [orgUsers, setOrgUsers] = useState<any[]>([]);
+
+    // PIN Protection Modals
+    const [pendingVerifyFolder, setPendingVerifyFolder] = useState<{ id: string, name: string } | null>(null);
+    const [enablePinFolder, setEnablePinFolder] = useState<{ id: string, name: string } | null>(null);
+    const [changePinFolder, setChangePinFolder] = useState<{ id: string, name: string } | null>(null);
+    const [disablePinFolder, setDisablePinFolder] = useState<{ id: string, name: string } | null>(null);
 
     useEffect(() => {
         getOrgChart().then(res => {
@@ -206,7 +266,8 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                 owner: ownerId || user?.id || 'sys', // default owner
                 status: 'draft',
                 parentId: cat.parentId ? String(cat.parentId) : null,
-                isDeleted: cat.deleted
+                isDeleted: cat.deleted,
+                isSecured: cat.isSecured
             }));
 
             // Map Backend Document to Frontend FileItem
@@ -219,7 +280,8 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                 owner: ownerId || user?.id || 'sys',
                 status: doc.status || 'DRAFT',
                 parentId: doc.folderId ? String(doc.folderId) : null,
-                isDeleted: doc.deleted
+                isDeleted: doc.deleted,
+                approverId: doc.approverId ? String(doc.approverId) : undefined
             }));
 
             setFiles([...mappedFolders, ...mappedDocuments]);
@@ -299,7 +361,11 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
         e.stopPropagation();
         const rawId = file.id.replace('folder_', '').replace('doc_', '');
         if (file.type === 'folder') {
-            onFolderChange(rawId);
+            if (file.isSecured) {
+                setPendingVerifyFolder({ id: rawId, name: file.name });
+            } else {
+                onFolderChange(rawId);
+            }
         } else {
             setViewFileId(rawId);
         }
@@ -539,6 +605,17 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
 
         try {
             await signTask;
+            // Gọi processApprovalAction để cập nhật trạng thái lịch sử duyệt sang Đã duyệt (APPROVED) và đẩy lên mốc tiếp theo.
+            try {
+                await processApprovalAction({
+                    documentId: Number(viewFileId),
+                    approved: true,
+                    comments: signReason || "Đã ký số tài liệu"
+                });
+            } catch (workflowErr) {
+                console.error("Lỗi cập nhật workflow:", workflowErr);
+            }
+
             setIsSignModalOpen(false);
             setSignP12File(null);
             setSignPassword("");
@@ -569,12 +646,20 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
 
     const handleSubmitForApprovalForm = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!viewFileId || !approverId) return;
+        if (!viewFileId || !workflowId) return;
         try {
-            await submitForApproval(viewFileId, approverId);
-            toast.success("Trình ký thành công", { description: "Tài liệu đã được gửi và đang chờ quản lý phê duyệt." });
+            const overridesArray = Object.keys(levelOverrides).map(k => ({
+                levelOrder: Number(k),
+                requireSignature: levelOverrides[Number(k)]
+            }));
+            await submitForApproval({ 
+                documentId: Number(viewFileId), 
+                approvalWorkflowId: Number(workflowId),
+                levelOverrides: overridesArray.length > 0 ? overridesArray : undefined
+            });
+            toast.success("Trình ký thành công", { description: "Tài liệu đã được gửi vào quy trình chờ duyệt." });
             setIsSubmitModalOpen(false);
-            setApproverId("");
+            setWorkflowId("");
             fetchFilesAndFolders();
             setViewFileId(null);
         } catch (e: any) {
@@ -585,7 +670,13 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
     const handleReject = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
         try {
-            await rejectDocument(id);
+            // Thay vì rejectDocument cũ, gọi workflow process
+            await processApprovalAction({
+                documentId: Number(id),
+                approved: false,
+                rejectionReason: "Từ chối duyệt tài liệu này",
+                comments: "Người duyệt đã chọn từ chối"
+            });
             toast.success("Từ chối thành công", { description: "Đã hủy yêu cầu cấp phép cho tài liệu." });
             fetchFilesAndFolders();
             setViewFileId(null);
@@ -597,7 +688,12 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
     const handleApproveWithoutSign = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
         try {
-            await approveDocument(id);
+            // Gọi processApprovalAction để tiếp tục quy trình duyệt không ký số
+            await processApprovalAction({
+                documentId: Number(id),
+                approved: true,
+                comments: "Duyệt nhanh hồ sơ (Không ký số)"
+            });
             toast.success("Phê duyệt thành công", { description: "Tài liệu đã được duyệt mà không cần chữ ký số." });
             fetchFilesAndFolders();
             setViewFileId(null);
@@ -798,6 +894,24 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                                 <button onClick={() => {setShareFolderId(contextMenu.id.replace('folder_', '')); setContextMenu(null);}} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-primary/10 hover:text-primary rounded-xl transition-colors">
                                     <Users className="w-4 h-4" /> Chia sẻ
                                 </button>
+                            )}
+                            {contextMenu && files.find(f => f.id === contextMenu.id)?.type === 'folder' && (
+                                <>
+                                    {files.find(f => f.id === contextMenu.id)?.isSecured ? (
+                                        <>
+                                            <button onClick={() => {setChangePinFolder({id: contextMenu.id.replace('folder_',''), name: files.find(f => f.id === contextMenu.id)?.name || ''}); setContextMenu(null);}} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100 rounded-xl transition-colors">
+                                                <ShieldAlert className="w-4 h-4 text-warning" /> Đổi mã PIN
+                                            </button>
+                                            <button onClick={() => {setDisablePinFolder({id: contextMenu.id.replace('folder_',''), name: files.find(f => f.id === contextMenu.id)?.name || ''}); setContextMenu(null);}} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100 rounded-xl transition-colors">
+                                                <X className="w-4 h-4 text-destructive" /> Tắt bảo mật PIN
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <button onClick={() => {setEnablePinFolder({id: contextMenu.id.replace('folder_',''), name: files.find(f => f.id === contextMenu.id)?.name || ''}); setContextMenu(null);}} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100 rounded-xl transition-colors">
+                                            <ShieldAlert className="w-4 h-4 text-emerald-500" /> Cài mã PIN
+                                        </button>
+                                    )}
+                                </>
                             )}
                             {contextMenu && files.find(f => f.id === contextMenu.id)?.type !== 'folder' && (
                                 <>
@@ -1091,28 +1205,48 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                                 <form onSubmit={handleSubmitForApprovalForm}>
                                     <div className="space-y-4 mb-8">
                                         <div>
-                                            <label className="text-xs font-bold text-slate-700 block mb-1">Chọn Người Duyệt (Manager / Admin)</label>
+                                            <label className="text-xs font-bold text-slate-700 block mb-1">Chọn Quy Trình Duyệt (*)</label>
                                             <select 
-                                                value={approverId}
-                                                onChange={e => setApproverId(e.target.value)}
+                                                value={workflowId}
+                                                onChange={handleWorkflowChange}
                                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer" 
                                                 required
                                             >
-                                                <option value="" disabled>-- Chọn Quản lý để Trình ký --</option>
-                                                {orgUsers
-                                                    .filter(u => String(u.id) !== String(user?.id) && (getUserRole(u) === 'MANAGER' || getUserRole(u) === 'ADMIN'))
-                                                    .map(u => (
-                                                        <option key={u.id} value={u.id}>
-                                                            {u.fullName || u.username} - {u.jobTitle || getUserRole(u)}
+                                                <option value="" disabled>-- Chọn quy trình để trình ký --</option>
+                                                {workflows.map(wf => (
+                                                        <option key={wf.id} value={wf.id}>
+                                                            {wf.name} ({wf.approvalLevels?.length || 0} bước)
                                                         </option>
                                                     ))}
                                             </select>
-                                            <p className="text-xs text-muted-foreground mt-2 italic">* Chỉ những tài khoản có vai trò Quản lý hoặc Admin mới có quyền phê duyệt.</p>
+                                            {workflowId && workflows.find(w => String(w.id) === String(workflowId))?.approvalLevels?.length > 0 && (
+                                                <div className="mt-4 space-y-2">
+                                                    <label className="text-xs font-bold text-slate-700 block mb-2">Tuỳ chỉnh bắt buộc Ký Số</label>
+                                                    {workflows.find(w => String(w.id) === String(workflowId)).approvalLevels.sort((a:any, b:any) => a.levelOrder - b.levelOrder).map((level: any) => (
+                                                        <div key={level.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-xs font-bold text-slate-800">{level.levelName}</span>
+                                                                <span className="text-[10px] text-muted-foreground">{level.approverName} - {level.approverJobTitle}</span>
+                                                            </div>
+                                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={levelOverrides[level.levelOrder] || false}
+                                                                    onChange={(e) => setLevelOverrides({...levelOverrides, [level.levelOrder]: e.target.checked})}
+                                                                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                                                                />
+                                                                <span className="text-[10px] font-bold text-slate-700">Ký Số</span>
+                                                            </label>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <p className="text-xs text-muted-foreground mt-2 italic">* Văn bản sẽ được chuyển đi theo tuần tự các cấp kiểm duyệt trong quy trình.</p>
                                         </div>
                                     </div>
                                     <div className="flex gap-3">
                                         <button type="button" onClick={() => setIsSubmitModalOpen(false)} className="flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase text-muted-foreground bg-slate-100 hover:bg-slate-200 transition-colors">Hủy</button>
-                                        <button type="submit" disabled={!approverId.trim()} className="flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase bg-blue-600 text-white shadow-neon flex items-center gap-2 justify-center hover:scale-[1.02] disabled:opacity-50 transition-all">
+                                        <button type="submit" disabled={!workflowId} className="flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase bg-blue-600 text-white shadow-neon flex items-center gap-2 justify-center hover:scale-[1.02] disabled:opacity-50 transition-all">
                                             <PenTool className="w-4 h-4" /> Gửi
                                         </button>
                                     </div>
@@ -1204,58 +1338,198 @@ export function FileExplorer({ title, currentFolderId, ownerId, user, folderType
                                         <div className="p-2 bg-primary/10 text-primary rounded-xl"><FileText className="w-5 h-5" /></div>
                                         <div>
                                             <h3 className="font-black text-lg">{fileToView.name}</h3>
-                                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">
-                                                Trạng thái: 
-                                                {fileToView.status === 'SIGNED' ? <span className="text-green-500 ml-1">Đã Ký Số</span> :
-                                                 fileToView.status === 'APPROVED' ? <span className="text-blue-500 ml-1">Đã Phê Duyệt</span> :
-                                                 fileToView.status === 'PENDING_APPROVAL' ? <span className="text-warning ml-1">Đang chờ duyệt</span> :
-                                                 fileToView.status === 'REJECTED' ? <span className="text-destructive ml-1">Từ chối thao tác</span> :
-                                                 <span className="text-slate-500 ml-1">Nháp (DRAFT)</span>}
-                                            </p>
+                                            <div className="flex items-center gap-3 mt-1">
+                                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                                                    Trạng thái: 
+                                                    {fileToView.status === 'SIGNED' ? <span className="text-green-500 ml-1">Đã Ký Số</span> :
+                                                     fileToView.status === 'APPROVED' ? <span className="text-blue-500 ml-1">Đã Phê Duyệt</span> :
+                                                     fileToView.status === 'PENDING_APPROVAL' ? <span className="text-warning ml-1">Đang chờ duyệt</span> :
+                                                     fileToView.status === 'REJECTED' ? <span className="text-destructive ml-1">Từ chối thao tác</span> :
+                                                     <span className="text-slate-500 ml-1">Nháp (DRAFT)</span>}
+                                                </p>
+                                                {documentApprovalHistory.length > 0 && (
+                                                    <div className="flex gap-1.5 items-center bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                                                        <span className="text-[9px] font-black uppercase text-slate-600">
+                                                            Đã ký: {documentApprovalHistory.filter(h => h.status === 'APPROVED').length}/{documentApprovalHistory.length} Cấp
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
+                                        {documentApprovalHistory.length > 0 && (
+                                            <button onClick={() => setShowApprovalPath(!showApprovalPath)} className="p-3 bg-secondary text-secondary-foreground rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                                                <List className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Luồng Duyệt</span>
+                                            </button>
+                                        )}
                                         {user?.role !== 'ADMIN' && fileToView.status === 'DRAFT' && (
                                             <button onClick={() => setIsSubmitModalOpen(true)} className="p-3 bg-blue-600 text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
                                                 <PenTool className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Trình Ký</span>
                                             </button>
                                         )}
-                                        {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && (fileToView.status === 'DRAFT' || fileToView.status === 'PENDING_APPROVAL') && (
+                                        {fileToView.status === 'DRAFT' && (user?.role === 'MANAGER' || user?.role === 'ADMIN') && (
                                             <button onClick={() => setIsSignModalOpen(true)} className="p-3 bg-primary text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
                                                 <PenTool className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Ký Số</span>
                                             </button>
                                         )}
-                                        {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && fileToView.status === 'PENDING_APPROVAL' && (
-                                            <button onClick={(e) => handleApproveWithoutSign(e, fileToView.id.replace('doc_', '').replace('folder_', ''))} className="p-3 bg-success text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
-                                                <CheckCircle className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Duyệt nhanh</span>
-                                            </button>
-                                        )}
-                                        {fileToView.status === 'PENDING_APPROVAL' && (user?.role === 'MANAGER' || user?.role === 'ADMIN') && (
-                                            <button onClick={(e) => handleReject(e, fileToView.id.replace('doc_', '').replace('folder_', ''))} className="p-3 bg-destructive text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
-                                                <X className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Từ chối</span>
-                                            </button>
+                                        {fileToView.status === 'PENDING_APPROVAL' && currentRequireSignature !== null && (
+                                            <>
+                                                {currentRequireSignature ? (
+                                                    <button onClick={() => setIsSignModalOpen(true)} className="p-3 bg-primary text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                                                        <PenTool className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Ký Số</span>
+                                                    </button>
+                                                ) : (
+                                                    <button onClick={(e) => handleApproveWithoutSign(e, fileToView.id.replace('doc_', '').replace('folder_', ''))} className="p-3 bg-success text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                                                        <CheckCircle className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Duyệt nhanh</span>
+                                                    </button>
+                                                )}
+                                                <button onClick={(e) => handleReject(e, fileToView.id.replace('doc_', '').replace('folder_', ''))} className="p-3 bg-destructive text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                                                    <X className="w-4 h-4" /> <span className="text-[10px] font-black uppercase hidden sm:inline">Từ chối</span>
+                                                </button>
+                                            </>
                                         )}
                                         <button onClick={() => setViewFileId(null)} className="p-3 hover:bg-slate-200 rounded-xl transition-all bg-slate-100">
                                             <X className="w-5 h-5 text-slate-600" />
                                         </button>
                                     </div>
                                 </div>
-                                <div className="flex-1 bg-slate-200/50 flex items-center justify-center p-8 overflow-auto">
-                                    {pdfUrl ? (
-                                        <iframe src={pdfUrl} className="w-full h-full rounded-xl shadow-xl border-0 bg-white" title="PDF Viewer" />
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-2xl shadow-xl min-h-[400px] w-full max-w-2xl">
-                                            <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin mb-6" />
-                                            <h3 className="text-xl font-black mb-2">Đang tải tài liệu...</h3>
-                                            <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Vui lòng chờ giây lát</p>
-                                        </div>
-                                    )}
+                                <div className="flex flex-1 overflow-hidden">
+                                    <div className={`flex-1 bg-slate-200/50 flex items-center justify-center p-8 overflow-auto transition-all duration-300 ${showApprovalPath ? 'w-2/3' : 'w-full'}`}>
+                                        {pdfUrl ? (
+                                            <iframe src={`${pdfUrl}#t=${Date.now()}`} className="w-full h-full rounded-xl shadow-xl border-0 bg-white" title="PDF Viewer" />
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-2xl shadow-xl min-h-[400px] w-full max-w-2xl">
+                                                <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin mb-6" />
+                                                <h3 className="text-xl font-black mb-2">Đang tải tài liệu...</h3>
+                                                <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Vui lòng chờ giây lát</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <AnimatePresence>
+                                        {showApprovalPath && (
+                                            <motion.div 
+                                                initial={{ width: 0, opacity: 0 }}
+                                                animate={{ width: 350, opacity: 1 }}
+                                                exit={{ width: 0, opacity: 0 }}
+                                                className="border-l border-slate-200 bg-slate-50 flex flex-col shrink-0"
+                                            >
+                                                <div className="p-4 font-black text-sm border-b border-slate-200 bg-white flex justify-between items-center">
+                                                    <span>Lịch Sử Luồng Duyệt</span>
+                                                    <button onClick={() => setShowApprovalPath(false)} className="p-1 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4"/></button>
+                                                </div>
+                                                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                                    {documentApprovalHistory.length === 0 ? (
+                                                        <p className="text-xs text-muted-foreground text-center mt-4">Chưa có luồng duyệt nào được cấu hình</p>
+                                                    ) : (
+                                                        documentApprovalHistory.map((step, idx) => (
+                                                            <div key={step.id} className="relative pl-6">
+                                                                {/* Timeline vertical line */}
+                                                                {idx < documentApprovalHistory.length - 1 && (
+                                                                    <div className="absolute left-[9px] top-6 bottom-[-24px] w-px bg-slate-200"></div>
+                                                                )}
+                                                                
+                                                                {/* Timeline dot */}
+                                                                <div className={`absolute left-0 top-1.5 w-[19px] h-[19px] rounded-full border-4 border-slate-50 z-10 flex items-center justify-center
+                                                                    ${step.status === 'APPROVED' ? 'bg-success' : 
+                                                                    step.status === 'REJECTED' ? 'bg-destructive' : 
+                                                                    'bg-slate-300'}`}
+                                                                ></div>
+                                                                
+                                                                <div className="bg-white border text-left border-slate-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow">
+                                                                    <div className="flex justify-between items-start mb-1">
+                                                                        <span className="text-[10px] font-black uppercase text-primary tracking-wider">Cấp duyệt {step.approvalLevel}</span>
+                                                                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${step.status === 'APPROVED' ? 'bg-success/10 text-success' : step.status === 'REJECTED' ? 'bg-destructive/10 text-destructive' : 'bg-warning/10 text-warning'}`}>
+                                                                            {step.status === 'APPROVED' ? 'Đã duyệt' : step.status === 'REJECTED' ? 'Từ chối' : 'Chờ duyệt'}
+                                                                        </span>
+                                                                    </div>
+                                                                    <h4 className="text-xs font-bold text-slate-800">{step.approverName}</h4>
+                                                                    <p className="text-[10px] text-slate-500 font-medium mb-2">{step.approverJobTitle}</p>
+                                                                    
+                                                                    <div className="flex items-center gap-1.5 mb-2">
+                                                                        <span className="text-[10px] font-medium text-slate-600 border border-slate-200 bg-slate-50 px-1.5 py-0.5 rounded-md">
+                                                                            Yêu cầu tác vụ: <strong className="text-slate-800">{step.requireSignature ? "KÝ SỐ" : "PHÊ DUYỆT"}</strong>
+                                                                        </span>
+                                                                    </div>
+
+                                                                    {step.reviewedAt && (
+                                                                        <div className="text-[9px] text-slate-400 font-medium mb-1 flex items-center gap-1">
+                                                                            <Clock className="w-3 h-3" />
+                                                                            {new Date(step.reviewedAt).toLocaleString('vi-VN')}
+                                                                        </div>
+                                                                    )}
+                                                                    
+                                                                    {step.comments && (
+                                                                        <p className="text-[10px] text-slate-600 bg-slate-50 p-2 rounded-lg mt-2 border border-slate-100 italic">"{step.comments}"</p>
+                                                                    )}
+                                                                    {step.rejectionReason && (
+                                                                        <p className="text-[10px] text-destructive bg-destructive/5 p-2 rounded-lg mt-2 border border-destructive/10 font-bold">Lý do từ chối: {step.rejectionReason}</p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
                             </motion.div>
                         </div>
                     )}
                 </AnimatePresence>,
                 document.body
+            )}
+
+            {/* Security Modals */}
+            {!!pendingVerifyFolder && (
+                <VerifyPinModal
+                    onClose={() => setPendingVerifyFolder(null)}
+                    folderId={pendingVerifyFolder?.id ? Number(pendingVerifyFolder.id) : 0}
+                    folderName={pendingVerifyFolder?.name || ''}
+                    onSuccess={() => {
+                        if (pendingVerifyFolder) {
+                            onFolderChange(pendingVerifyFolder.id);
+                            setPendingVerifyFolder(null);
+                        }
+                    }}
+                />
+            )}
+
+            {!!enablePinFolder && (
+                <EnablePinModal
+                    onClose={() => setEnablePinFolder(null)}
+                    folderId={enablePinFolder?.id ? Number(enablePinFolder.id) : 0}
+                    folderName={enablePinFolder?.name || ''}
+                    onSuccess={() => {
+                        setEnablePinFolder(null);
+                        fetchFilesAndFolders();
+                    }}
+                />
+            )}
+
+            {!!changePinFolder && (
+                <ChangePinModal
+                    onClose={() => setChangePinFolder(null)}
+                    folderId={changePinFolder?.id ? Number(changePinFolder.id) : 0}
+                    folderName={changePinFolder?.name || ''}
+                    onSuccess={() => {
+                        setChangePinFolder(null);
+                    }}
+                />
+            )}
+
+            {!!disablePinFolder && (
+                <DisablePinModal
+                    onClose={() => setDisablePinFolder(null)}
+                    folderId={disablePinFolder?.id ? Number(disablePinFolder.id) : 0}
+                    folderName={disablePinFolder?.name || ''}
+                    onSuccess={() => {
+                        setDisablePinFolder(null);
+                        fetchFilesAndFolders();
+                    }}
+                />
             )}
         </div>
     );
